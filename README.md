@@ -15,6 +15,7 @@ database is used.
 
 ## People
 * [Jim Chiang](https://github.com/DarkEnergyScienceCollaboration/Pserv/issues/new?body=@jchiang87) (SLAC)
+* [Phil Marshall](https://github.com/DarkEnergyScienceCollaboration/Pserv/issues/new?body=@drphilmarshall) (SLAC)
 
 ## License, etc.
 
