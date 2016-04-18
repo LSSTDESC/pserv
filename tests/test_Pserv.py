@@ -135,8 +135,6 @@ class PservTestCase(unittest.TestCase):
         package the query results.
         """
         self._fill_test_table()
-        def my_func(curs):
-            return dict([row for row in curs])
         query = "select keywd, int_value, float_value from %s" % self.test_table
         table_data = self.connection.apply(
             query, cursorFunc=lambda curs: tuple(x for x in curs))
@@ -147,17 +145,7 @@ class PservTestCase(unittest.TestCase):
         Test the creation of a csv file from a FITS binary table.
         """
         self._create_fits_bintable()
-        # column_mapping should be an OrderedDict that maps the columns
-        # in the input FITS table to the column name in the db to be
-        # loaded with the csv data.
-        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
-                                      ('int_value', 'INT_VALUE'),
-                                      ('float_value', 'FLOAT_VALUE')))
-        csv_file = 'test_file.csv'
-        desc.pserv.create_csv_file_from_fits(self.fits_file,
-                                             self.fits_hdunum,
-                                             csv_file,
-                                             column_mapping=column_mapping)
+        csv_file = self._create_csv_file()
         csv_data = []
         with open(csv_file, 'r') as csv_input:
             reader = csv.reader(csv_input, delimiter=',')
@@ -170,41 +158,56 @@ class PservTestCase(unittest.TestCase):
         os.remove(self.fits_file)
         os.remove(csv_file)
 
-#    def test_load_csv(self):
-#        """
-#        Test that the csv-loaded file returns consistent data from the
-#        db table when queried.
-#        """
-#        column_mapping = OrderedDict(keywd='KEYWORD', value='VALUE')
-#        self._create_fits_bintable()
-#        csv_file = 'test_file.csv'
-#        desc.pserv.create_csv_file_from_fits(self.fits_file,
-#                                             self.fits_hdunum,
-#                                             csv_file,
-#                                             column_mapping=column_mapping)
-#        self.connection.load_csv(self.test_table, csv_file)
-#        def my_func(curs):
-#            "Retrieve key/value pairs as a dict."
-#            return dict([row for row in curs])
-#        query = "select keywd, value from %s" % self.test_table
-#        table_data = self.connection.apply(
-#            query, cursorFunc=lambda curs: OrderedDict([row for row in curs]) )
-#        self.assertEqual(table_data, self.data)
-#        os.remove(self.fits_file)
-#        os.remove(csv_file)
-#
-#    def test_incorrect_cvs_mapping(self):
-#        """
-#        Test that the column_mapping is checked against the db table
-#        when loaded and that an incorrect mapping (wrong column order
-#        and incorrect column names) raises an exception.
-#        """
-#        column_mapping = OrderedDict(keyword='KEYWORD', value='VALUE')
-#        desc.pserv.create_cvs_from_fits(self.fits_file, self.fits_ext,
-#                                        csvfile, column_mapping=column_mapping)
-#        self.assertRaises(RuntimeError, desc.pserv.load_csv,
-#                          (self.test_table, csvfile))
-#
+    def _create_csv_file(self, csv_file='test_file.csv',
+                         column_mapping=None):
+        """
+        Create a csv file from the FITS binary table.
+        """
+        if column_mapping is None:
+            column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                          ('int_value', 'INT_VALUE'),
+                                          ('float_value', 'FLOAT_VALUE')))
+        desc.pserv.create_csv_file_from_fits(self.fits_file,
+                                             self.fits_hdunum,
+                                             csv_file,
+                                             column_mapping=column_mapping)
+        return csv_file
+
+    def test_incorrect_cvs_mapping(self):
+        """
+        Test that an incorrect column mapping raises a RuntimeError.
+        """
+        self._create_fits_bintable()
+        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('int_value', 'INT_VALUE')))
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        self.assertRaises(RuntimeError, self.connection.load_csv,
+                          *(self.test_table, csv_file))
+        os.remove(self.fits_file)
+        os.remove(csv_file)
+
+    def test_load_csv(self):
+        """
+        Test that after loading the csv file generated from FITS data,
+        a query returns data consistent with the reference data.
+        """
+        self._create_fits_bintable()
+        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('int_value', 'INT_VALUE'),
+                                      ('float_value', 'FLOAT_VALUE')))
+        csv_file = 'test_file.csv'
+        desc.pserv.create_csv_file_from_fits(self.fits_file,
+                                             self.fits_hdunum,
+                                             csv_file,
+                                             column_mapping=column_mapping)
+        self.connection.load_csv(self.test_table, csv_file)
+        query = "select keywd, int_value, float_value from %s" % self.test_table
+        table_data = self.connection.apply(
+            query, cursorFunc=lambda curs: tuple(x for x in curs))
+        self._compare_to_ref_data(table_data)
+        os.remove(self.fits_file)
+        os.remove(csv_file)
 
 if __name__ == '__main__':
     unittest.main()
