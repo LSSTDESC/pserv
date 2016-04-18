@@ -1,10 +1,16 @@
 """
 Pserv: Practice LSST database server code.
 """
+from __future__ import absolute_import, print_function
+from builtins import zip
+from collections import OrderedDict
 import copy
+import csv
 import json
+import astropy.io.fits as fits
 import MySQLdb
 
+__all__ = ['LsstDbConnection', 'create_csv_file_from_fits']
 
 def _nullFunc(*args):
     """
@@ -23,6 +29,7 @@ class LsstDbConnection(object):
         """
         Constructor to make the connection object.
         """
+        kwds['local_infile'] = 1  # enable LOAD LOCAL INFILE
         self._get_mysql_connection(kwds)
 
     def __del__(self):
@@ -78,3 +85,36 @@ class LsstDbConnection(object):
         if cursorFunc is _nullFunc:
             self._mysql_connection.commit()
         return results
+
+    def load_csv(self, table_name, csv_file):
+        """
+        Load a csv file into the specified table.
+        """
+        # Get the column names and data types.
+        query = """SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+                   WHERE TABLE_NAME='%(table_name)s'""" % locals()
+        data_types = self.apply(query,
+                                lambda curs: OrderedDict(x for x in curs))
+        print(data_types)
+        query = """LOAD DATA LOCAL INFILE '%(csv_file)s'
+                   INTO TABLE %(table_name)s
+                   FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n'
+                   IGNORE 1 LINES
+                   (keywd, value) set value=cast(value as decimal(30,30));""" % locals()
+        self.apply(query)
+
+def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
+                              column_mapping=None):
+    hdulist = fits.open(fits_file)
+    bintable = hdulist[fits_hdunum]
+    if column_mapping is None:
+        column_mapping = dict([(coldef.name, coldef.name)
+                               for coldef in bintable.columns])
+    with open(csv_file, 'w') as csv_output:
+        writer = csv.writer(csv_output, delimiter=',')
+        writer.writerow(list(column_mapping.keys()))
+        data = zip(*tuple(bintable.data[colname].tolist()
+                          for colname in column_mapping.values()))
+        for row in data:
+            writer.writerow(row)
+
