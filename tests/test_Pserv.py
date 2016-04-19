@@ -176,11 +176,8 @@ class PservTestCase(unittest.TestCase):
                                              column_mapping=column_mapping)
         return csv_file
 
-    def test_create_csv_file_from_fits(self):
-        """
-        Test the creation of a csv file from a FITS binary table.
-        """
-        csv_file = self.csv_file
+    @staticmethod
+    def _read_csv_file(csv_file):
         csv_data = []
         with open(csv_file, 'r') as csv_input:
             reader = csv.reader(csv_input, delimiter=',')
@@ -189,6 +186,13 @@ class PservTestCase(unittest.TestCase):
                     # Skip the header line.
                     continue
                 csv_data.append((row[0], int(row[1]), float(row[2])))
+        return csv_data
+
+    def test_create_csv_file_from_fits(self):
+        """
+        Test the creation of a csv file from a FITS binary table.
+        """
+        csv_data = self._read_csv_file(self.csv_file)
         self._compare_to_ref_data(csv_data)
 
     def test_create_csv_file_from_fits_with_constant_columns(self):
@@ -201,12 +205,12 @@ class PservTestCase(unittest.TestCase):
                                       ('int_value', int_value),
                                       ('float_value', 'FLOAT_VALUE'),
                                       ('double_value', 'DOUBLE_VALUE')))
-        self._create_csv_file(column_mapping=column_mapping)
-        query_data = self._query_test_table()
-        for query_row, ref_row in zip(query_data, self.data):
-            self.assertEqual(query_row[0], ref_row[0])
-            self.assertEqual(query_row[1], int_value)
-            fp1 = '%.5e' % query_row[2]
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        csv_data = self._read_csv_file(csv_file)
+        for csv_row, ref_row in zip(csv_data, self.data):
+            self.assertEqual(csv_row[0], ref_row[0])
+            self.assertEqual(csv_row[1], int_value)
+            fp1 = '%.5e' % csv_row[2]
             fp2 = '%.5e' % ref_row[2]
             self.assertEqual(fp1, fp2)
 
@@ -215,12 +219,12 @@ class PservTestCase(unittest.TestCase):
                                       ('int_value', 'INT_VALUE'),
                                       ('float_value', float_value),
                                       ('double_value', 'DOUBLE_VALUE')))
-        self._create_csv_file(column_mapping=column_mapping)
-        query_data = self._query_test_table()
-        for query_row, ref_row in zip(query_data, self.data):
-            self.assertEqual(query_row[0], ref_row[0])
-            self.assertEqual(query_row[1], ref_row[1])
-            fp1 = '%.5e' % query_row[2]
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        csv_data = self._read_csv_file(csv_file)
+        for csv_row, ref_row in zip(csv_data, self.data):
+            self.assertEqual(csv_row[0], ref_row[0])
+            self.assertEqual(csv_row[1], ref_row[1])
+            fp1 = '%.5e' % csv_row[2]
             fp2 = '%.5e' % float_value
             self.assertEqual(fp1, fp2)
 
