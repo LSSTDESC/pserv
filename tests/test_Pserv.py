@@ -54,7 +54,7 @@ class PservTestCase(unittest.TestCase):
         self.connection = desc.pserv.LsstDbConnection(**_db_info)
         self.test_table = 'my_test'
         self.data = (('a', 1, 130.), ('b', 4, 1e-7), ('c', 100, np.pi),
-                     ('d', 3, 4e30))
+                     ('d', 3, 4e9))
         self._create_test_table()
         # FITS/csv related set up:
         self.fits_file = 'my_test_data.fits'
@@ -186,12 +186,44 @@ class PservTestCase(unittest.TestCase):
                 csv_data.append((row[0], int(row[1]), float(row[2])))
         self._compare_to_ref_data(csv_data)
 
+    def test_create_csv_file_from_fits_with_constant_columns(self):
+        """
+        Test the creation of csv file from a FITS binary table with
+        constant numeric column values set in the column_mapping.
+        """
+        int_value = 52
+        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('int_value', int_value),
+                                      ('float_value', 'FLOAT_VALUE')))
+        self._create_csv_file(column_mapping=column_mapping)
+        query_data = self._query_test_table()
+        for query_row, ref_row in zip(query_data, self.data):
+            self.assertEqual(query_row[0], ref_row[0])
+            self.assertEqual(query_row[1], int_value)
+            fp1 = '%.5e' % query_row[2]
+            fp2 = '%.5e' % ref_row[2]
+            self.assertEqual(fp1, fp2)
+
+        float_value = 719.3449
+        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('int_value', 'INT_VALUE'),
+                                      ('float_value', float_value)))
+        self._create_csv_file(column_mapping=column_mapping)
+        query_data = self._query_test_table()
+        for query_row, ref_row in zip(query_data, self.data):
+            self.assertEqual(query_row[0], ref_row[0])
+            self.assertEqual(query_row[1], ref_row[1])
+            fp1 = '%.5e' % query_row[2]
+            fp2 = '%.5e' % float_value
+            self.assertEqual(fp1, fp2)
+
     def test_load_csv(self):
         """
         Test that after loading the csv file generated from FITS data,
         a query returns data consistent with the reference data.
         """
         csv_file = self.csv_file
+        self.connection.load_csv(self.test_table, csv_file)
         table_data = self._query_test_table()
         self._compare_to_ref_data(table_data)
 

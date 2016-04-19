@@ -104,7 +104,10 @@ class LsstDbConnection(object):
         # Check for conversions from non-char(n) data types.
         conversions = [dt_pair for dt_pair in data_types
                        if dt_pair[1].find('char') == -1]
-        dtypes = dict((('int', 'SIGNED'), ('float', 'DECIMAL(30,20)')))
+        dtypes = dict((('int', 'SIGNED'),
+                       ('bigint', 'SIGNED'),
+                       ('tinyint', 'SIGNED'),
+                       ('float', 'DECIMAL(30,20)')))
         if conversions:
             query += ' set \n'
             cast_list = []
@@ -141,8 +144,15 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
     with open(csv_file, 'w') as csv_output:
         writer = csv.writer(csv_output, delimiter=',')
         writer.writerow(list(column_mapping.keys()))
-        data = zip(*tuple(bintable.data[colname].tolist()
-                          for colname in column_mapping.values()))
+        nrows = bintable.header['NAXIS2']
+        columns = []
+        for csv_name, colname in column_mapping.items():
+            if isinstance(colname, basestring):
+                coldata = bintable.data[colname].tolist()
+                columns.append(coldata)
+            else: # Assume colname is a numeric constant.
+                columns.append([colname]*nrows)
+        data = zip(*tuple(columns))
         for row in data:
             writer.writerow(row)
 
