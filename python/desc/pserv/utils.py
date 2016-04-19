@@ -1,7 +1,7 @@
 """
 Utilities for ingesting Stack data products into the MySQL tables.
 """
-from __future__ import absolute_import, print_function
+from __future__ import absolute_import, print_function, division
 import os
 import sys
 from collections import OrderedDict

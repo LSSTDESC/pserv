@@ -21,7 +21,7 @@ def _nullFunc(*args):
 
 class LsstDbConnection(object):
     """
-    Class to manage MySQL connections using Borg attribute management.
+    Class to manage MySQL connections using Borg pattern.
     """
     __connection_pool = dict()
     __connection_refs = dict()
@@ -137,7 +137,7 @@ class LsstDbConnection(object):
 
     @staticmethod
     def check_column_names(column_names, csv_file):
-        "Check the column names againts those in the csv file."
+        "Check the column names against those in the csv file."
         with open(csv_file, 'r') as csv_input:
             csv_cols = csv_input.readline().strip().split(',')
         if len(csv_cols) != len(column_names):
@@ -163,7 +163,7 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
         nrows = bintable.header['NAXIS2']
         columns = []
         for csv_name, colname in column_mapping.items():
-            if isinstance(colname, basestring):
+            if isinstance(colname, str):
                 coldata = bintable.data[colname].tolist()
                 columns.append(coldata)
             else: # Assume colname is a numeric constant.

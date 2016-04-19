@@ -1,6 +1,7 @@
 """
 Script to create and load CcdVisit, Object, and ForcedSource tables.
 """
+from __future__ import absolute_import, print_function
 import os
 from warnings import filterwarnings
 import MySQLdb as Database
@@ -23,7 +24,7 @@ def create_table(connection, table_name, dry_run=False, clobber=False):
     connection.run_script(create_script, dry_run=dry_run)
 
 if __name__ == '__main__':
-    connection = desc.pserv.LsstDbConnection(db='jc_fermi',
+    connection = desc.pserv.LsstDbConnection(db='DESC_Twinkles_Level_2',
                                              read_default_file='~/.my.cnf')
     dry_run = False
     repo = '/nfs/slac/kipac/fs1/g/desc/Twinkles/400'
@@ -48,7 +49,7 @@ if __name__ == '__main__':
     print("Ingesting forced source catalogs into ForcedSource table.")
     visits = get_visits(repo)
     for band, visit_list in visits.items():
-        print "Processing band", band, "for", len(visit_list), "visits."
+        print("Processing band", band, "for", len(visit_list), "visits.")
         for ccdVisitId in visit_list:
             visit_name = 'v%i-f%s' % (ccdVisitId, band)
             #
@@ -58,6 +59,6 @@ if __name__ == '__main__':
             #
             catalog_file = os.path.join(repo, 'forced', '0',
                                         visit_name, 'R22', 'S11.fits')
-            print "Processing", visit_name
+            print("Processing", visit_name)
             pserv_utils.ingest_ForcedSource_data(connection, catalog_file,
                                                  ccdVisitId)
