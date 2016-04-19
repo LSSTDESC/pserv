@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 """
 Script to create and load CcdVisit, Object, and ForcedSource tables.
 """
 from __future__ import absolute_import, print_function
 import os
+import sys
 from warnings import filterwarnings
 import MySQLdb as Database
 import desc.pserv
@@ -14,8 +16,8 @@ filterwarnings('ignore', category=Database.Warning)
 
 def create_table(connection, table_name, dry_run=False, clobber=False):
     """
-    Create the specified table using the create script in the sql
-    folder.
+    Create the specified table using the corresponding script in the
+    sql subfolder.
     """
     if clobber and not dry_run:
         connection.apply('drop table if exists %s' % table_name)
@@ -23,33 +25,18 @@ def create_table(connection, table_name, dry_run=False, clobber=False):
                                  'create_%s.sql' % table_name)
     connection.run_script(create_script, dry_run=dry_run)
 
-if __name__ == '__main__':
-    connection = desc.pserv.LsstDbConnection(db='DESC_Twinkles_Level_2',
-                                             read_default_file='~/.my.cnf')
-    dry_run = False
-    repo = '/nfs/slac/kipac/fs1/g/desc/Twinkles/400'
+def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
+                  dry_run=False, clobber=False):
+    "Create the CcdVisit, Object, and ForcedSource tables."
+    for table_name in tables:
+        create_table(connection, table_name, dry_run=dry_run, clobber=clobber)
 
-    # Create the CcdVisit, Object, and ForcedSource tables.
-    create_table(connection, 'CcdVisit', dry_run=dry_run)
-    create_table(connection, 'Object', dry_run=dry_run)
-    create_table(connection, 'ForcedSource', dry_run=dry_run)
-
-    # Ingest registry.sqlite3 data.
-    print("Ingesting registry data into CcdVisit table.")
-    registry_file = find_registry(repo)
-    pserv_utils.ingest_registry(connection, registry_file)
-
-    # Ingest the Object data.
-    print("Ingesting ref-0-0,0.fits into Object table.")
-    object_catalog = os.path.join(repo, 'deepCoadd-results/merged/0/0,0',
-                                  'ref-0-0,0.fits')
-    pserv_utils.ingest_Object_data(connection, object_catalog)
-
-    # Ingest the forced source data.
-    print("Ingesting forced source catalogs into ForcedSource table.")
+def ingest_forced_catalogs(connection, repo, dry_run=False):
+    "Ingest forced source catalogs into ForcedSource table."
     visits = get_visits(repo)
     for band, visit_list in visits.items():
         print("Processing band", band, "for", len(visit_list), "visits.")
+        sys.stdout.flush()
         for ccdVisitId in visit_list:
             visit_name = 'v%i-f%s' % (ccdVisitId, band)
             #
@@ -60,5 +47,42 @@ if __name__ == '__main__':
             catalog_file = os.path.join(repo, 'forced', '0',
                                         visit_name, 'R22', 'S11.fits')
             print("Processing", visit_name)
-            pserv_utils.ingest_ForcedSource_data(connection, catalog_file,
-                                                 ccdVisitId)
+            sys.stdout.flush()
+            if not dry_run:
+                pserv_utils.ingest_ForcedSource_data(connection, catalog_file,
+                                                     ccdVisitId)
+
+if __name__ == '__main__':
+    import argparse
+
+    description = """Script to create and load CcdVisit, Object, and Forced
+Source tables with Level 2 pipeline ouput."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('repo', help='Repository with Stack output')
+    parser.add_argument('--database', type=str, default='DESC_Twinkles_Level_2',
+                        help='Database to use')
+    parser.add_argument('--mysql_config', type=str, default='~/.my.cnf',
+                        help='MySQL config file')
+    parser.add_argument('--dry_run', default=False, action='store_true',
+                        help='Do not execute queries')
+    args = parser.parse_args()
+
+    connect = desc.pserv.LsstDbConnection(db=args.database,
+                                          read_default_file=args.mysql_config)
+
+    create_tables(connect, dry_run=args.dry_run)
+
+    registry_file = find_registry(args.repo)
+    if args.dry_run:
+        print("Ingest registry file", registry_file)
+    else:
+        pserv_utils.ingest_registry(connect, registry_file)
+
+    object_catalog = os.path.join(args.repo, 'deepCoadd-results/merged/0/0,0',
+                                  'ref-0-0,0.fits')
+    if args.dry_run:
+        print("Ingest object catalog", object_catalog)
+    else:
+        pserv_utils.ingest_Object_data(connect, object_catalog)
+
+    ingest_forced_catalogs(connect, args.repo, dry_run=args.dry_run)

@@ -70,7 +70,7 @@ def ingest_Object_data(connection, catalog_file):
                                          data['coord_ra'],
                                          data['coord_dec'],
                                          data['parent']):
-        if nrows % (nobjs/20) == 0:
+        if nrows % int(nobjs/20) == 0:
             sys.stdout.write('.')
             sys.stdout.flush()
         ra_val = ra*180./np.pi
