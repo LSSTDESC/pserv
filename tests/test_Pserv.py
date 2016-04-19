@@ -53,8 +53,10 @@ class PservTestCase(unittest.TestCase):
         """
         self.connection = desc.pserv.LsstDbConnection(**_db_info)
         self.test_table = 'my_test'
-        self.data = (('a', 1, 130.), ('b', 4, 1e-7), ('c', 100, np.pi),
-                     ('d', 3, 4e9))
+        self.data = (('a', 1, 130., 3.1943029977e-24),
+                     ('b', 4, 1.4938229e-20, 4.408099891e10),
+                     ('c', 100, np.pi, np.pi),
+                     ('d', 3, 4.9039542e20, 9.487982348e30))
         self._create_test_table()
         # FITS/csv related set up:
         self.fits_file = 'my_test_data.fits'
@@ -99,7 +101,7 @@ class PservTestCase(unittest.TestCase):
         """
         self.connection.apply('drop table if exists %s;' % self.test_table)
         query = """create table %s (keywd char(1), int_value int,
-                   float_value float);""" % self.test_table
+                   float_value float, double_value double);""" % self.test_table
         self.connection.apply(query)
 
     def _fill_test_table(self):
@@ -107,7 +109,8 @@ class PservTestCase(unittest.TestCase):
         Fill the test db table with key/value pairs from self.data.
         """
         table_name = self.test_table
-        values = ','.join(["('%s', %i, %e)" % row for row in self.data]) + ';'
+        values = ','.join(["('%s', %i, %e, %e)" % row
+                           for row in self.data]) + ';'
         query = "insert into %(table_name)s values %(values)s" % locals()
         self.connection.apply(query)
 
@@ -119,15 +122,16 @@ class PservTestCase(unittest.TestCase):
         return self.connection.apply(
             query, cursorFunc=lambda curs: tuple(x for x in curs))
 
-    def _compare_to_ref_data(self, query_data):
+    def _compare_to_ref_data(self, query_data, places=5):
         "Compare data from querys to reference data."
         for query_row, ref_row in zip(query_data, self.data):
             self.assertEqual(query_row[0], ref_row[0])
             self.assertEqual(query_row[1], ref_row[1])
-            fp1 = '%.5e' % query_row[2]
-            fp2 = '%.5e' % ref_row[2]
+            format = '%.' + str(places) + 'e'
+            fp1 = format % query_row[2]
+            fp2 = format % ref_row[2]
             self.assertEqual(fp1, fp2)
-            #self.assertAlmostEqual(query_row[2], ref_row[2], places=5)
+            #self.assertAlmostEqual(query_row[2], ref_row[2], places=places)
 
     def test_apply_cursorFunc(self):
         """
@@ -145,8 +149,8 @@ class PservTestCase(unittest.TestCase):
         """
         hdulist = fits.HDUList()
         hdulist.append(fits.PrimaryHDU())
-        colnames = ['KEYWORD', 'INT_VALUE', 'FLOAT_VALUE']
-        formats = 'AIE'
+        colnames = ['KEYWORD', 'INT_VALUE', 'FLOAT_VALUE', 'DOUBLE_VALUE']
+        formats = 'AIED'
         data = list(zip(*self.data))
         columns = [fits.Column(name=colnames[i], format=formats[i],
                                array=data[i]) for i in range(len(colnames))]
@@ -165,7 +169,8 @@ class PservTestCase(unittest.TestCase):
         if column_mapping is None:
             column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                           ('int_value', 'INT_VALUE'),
-                                          ('float_value', 'FLOAT_VALUE')))
+                                          ('float_value', 'FLOAT_VALUE'),
+                                          ('double_value', 'DOUBLE_VALUE')))
         desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdnum,
                                              csv_file,
                                              column_mapping=column_mapping)
@@ -194,7 +199,8 @@ class PservTestCase(unittest.TestCase):
         int_value = 52
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('int_value', int_value),
-                                      ('float_value', 'FLOAT_VALUE')))
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('double_value', 'DOUBLE_VALUE')))
         self._create_csv_file(column_mapping=column_mapping)
         query_data = self._query_test_table()
         for query_row, ref_row in zip(query_data, self.data):
@@ -207,7 +213,8 @@ class PservTestCase(unittest.TestCase):
         float_value = 719.3449
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
-                                      ('float_value', float_value)))
+                                      ('float_value', float_value),
+                                      ('double_value', 'DOUBLE_VALUE')))
         self._create_csv_file(column_mapping=column_mapping)
         query_data = self._query_test_table()
         for query_row, ref_row in zip(query_data, self.data):
@@ -234,7 +241,8 @@ class PservTestCase(unittest.TestCase):
         # Test incorrect column ordering.
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('float_value', 'FLOAT_VALUE'),
-                                      ('int_value', 'INT_VALUE')))
+                                      ('int_value', 'INT_VALUE'),
+                                      ('double_value', 'DOUBLE_VALUE')))
         csv_file = self._create_csv_file(column_mapping=column_mapping)
         self.assertRaises(RuntimeError, self.connection.load_csv,
                           *(self.test_table, csv_file))
@@ -242,7 +250,8 @@ class PservTestCase(unittest.TestCase):
         # Test incorrect column name.
         column_mapping = OrderedDict((('keyword', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
-                                      ('float_value', 'FLOAT_VALUE')))
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('double_value', 'DOUBLE_VALUE')))
         csv_file = self._create_csv_file(column_mapping=column_mapping)
         self.assertRaises(RuntimeError, self.connection.load_csv,
                           *(self.test_table, csv_file))
@@ -251,7 +260,8 @@ class PservTestCase(unittest.TestCase):
         column_mapping = OrderedDict((('keyword', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
                                       ('float_value', 'FLOAT_VALUE'),
-                                      ('float2_value', 'FLOAT_VALUE')))
+                                      ('float2_value', 'FLOAT_VALUE'),
+                                      ('double_value', 'DOUBLE_VALUE')))
         csv_file = self._create_csv_file(column_mapping=column_mapping)
         self.assertRaises(RuntimeError, self.connection.load_csv,
                           *(self.test_table, csv_file))

@@ -107,7 +107,8 @@ class LsstDbConnection(object):
         dtypes = dict((('int', 'SIGNED'),
                        ('bigint', 'SIGNED'),
                        ('tinyint', 'SIGNED'),
-                       ('float', 'DECIMAL(30,20)')))
+                       ('float', 'DECIMAL(50,25)'),
+                       ('double', 'DECIMAL(65,30)')))
         if conversions:
             query += ' set \n'
             cast_list = []
