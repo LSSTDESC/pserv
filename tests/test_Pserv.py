@@ -2,12 +2,12 @@
 Unit tests for pserv package.
 """
 from __future__ import absolute_import, print_function
-from builtins import zip
 import os
-from collections import OrderedDict
 import csv
-from warnings import filterwarnings
 import unittest
+from collections import OrderedDict
+from warnings import filterwarnings
+from builtins import zip
 import numpy as np
 import astropy.io.fits as fits
 import MySQLdb as Database
@@ -44,17 +44,22 @@ _db_info = get_db_info()
 
 @unittest.skipUnless(_db_info, "MySQL database not available")
 class PservTestCase(unittest.TestCase):
+    """
+    TestCase for Pserv module.
+    """
     def setUp(self):
         """
         Create a connection and test table.
         """
-        global _db_info
         self.connection = desc.pserv.LsstDbConnection(**_db_info)
         self.test_table = 'my_test'
-        self.fits_file = 'my_test_data.fits'
-        self.fits_hdunum = 1
-        self.data = (('a', 1, 130.), ('b', 4, 1e-7), ('c', 100, np.pi))
+        self.data = (('a', 1, 130.), ('b', 4, 1e-7), ('c', 100, np.pi),
+                     ('d', 3, 4e30))
         self._create_test_table()
+        # FITS/csv related set up:
+        self.fits_file = 'my_test_data.fits'
+        self._create_fits_bintable()
+        self.csv_file = self._create_csv_file()
 
     def tearDown(self):
         """
@@ -62,12 +67,16 @@ class PservTestCase(unittest.TestCase):
         """
         self.connection.apply('drop table if exists %s;' % self.test_table)
         del self.connection
+        # FITS/csv related tear down:
+        if os.path.isfile(self.fits_file):
+            os.remove(self.fits_file)
+        if os.path.isfile(self.csv_file):
+            os.remove(self.csv_file)
 
     def test_connection_management(self):
         """
         White-box tests of connection pool management.
         """
-        global _db_info
         num_cobjs = 3
         connection_objects = [desc.pserv.LsstDbConnection(**_db_info)
                               for i in range(num_cobjs)]
@@ -83,6 +92,51 @@ class PservTestCase(unittest.TestCase):
                              len(connection_objects))
             cobj_last = connection_objects.pop()
             del cobj_last
+
+    def _create_test_table(self):
+        """
+        Create the test table.
+        """
+        self.connection.apply('drop table if exists %s;' % self.test_table)
+        query = """create table %s (keywd char(1), int_value int,
+                   float_value float);""" % self.test_table
+        self.connection.apply(query)
+
+    def _fill_test_table(self):
+        """
+        Fill the test db table with key/value pairs from self.data.
+        """
+        table_name = self.test_table
+        values = ','.join(["('%s', %i, %e)" % row for row in self.data]) + ';'
+        query = "insert into %(table_name)s values %(values)s" % locals()
+        self.connection.apply(query)
+
+    def _query_test_table(self):
+        """
+        Query for the test table contents.
+        """
+        query = "select keywd, int_value, float_value from %s" % self.test_table
+        return self.connection.apply(
+            query, cursorFunc=lambda curs: tuple(x for x in curs))
+
+    def _compare_to_ref_data(self, query_data):
+        "Compare data from querys to reference data."
+        for query_row, ref_row in zip(query_data, self.data):
+            self.assertEqual(query_row[0], ref_row[0])
+            self.assertEqual(query_row[1], ref_row[1])
+            fp1 = '%.5e' % query_row[2]
+            fp2 = '%.5e' % ref_row[2]
+            self.assertEqual(fp1, fp2)
+            #self.assertAlmostEqual(query_row[2], ref_row[2], places=5)
+
+    def test_apply_cursorFunc(self):
+        """
+        Test the apply method using a cursor function to retrieve and
+        package the query results.
+        """
+        self._fill_test_table()
+        table_data = self._query_test_table()
+        self._compare_to_ref_data(table_data)
 
     def _create_fits_bintable(self):
         """
@@ -103,63 +157,8 @@ class PservTestCase(unittest.TestCase):
             os.remove(self.fits_file)
         hdulist.writeto(self.fits_file)
 
-    def _create_test_table(self):
-        """
-        Create the test table.
-        """
-        self.connection.apply('drop table if exists %s;' % self.test_table)
-        table_name = self.test_table
-        query = """create table %s (keywd char(1), int_value int,
-                   float_value float);""" % self.test_table
-        self.connection.apply(query)
-
-    def _fill_test_table(self):
-        """
-        Fill the test db table with key/value pairs from self.data.
-        """
-        table_name = self.test_table
-        values = ','.join(["('%s', %i, %e)" % row for row in self.data]) + ';'
-        query = "insert into %(table_name)s values %(values)s" % locals()
-        self.connection.apply(query)
-
-    def _compare_to_ref_data(self, query_data):
-        "Compare data from querys to reference data."
-        for query_row, ref_row in zip(query_data, self.data):
-            self.assertEqual(query_row[0], ref_row[0])
-            self.assertEqual(query_row[1], ref_row[1])
-            self.assertAlmostEqual(query_row[2], ref_row[2], places=5)
-
-    def test_apply_cursorFunc(self):
-        """
-        Test the apply method using a cursor function to retrieve and
-        package the query results.
-        """
-        self._fill_test_table()
-        query = "select keywd, int_value, float_value from %s" % self.test_table
-        table_data = self.connection.apply(
-            query, cursorFunc=lambda curs: tuple(x for x in curs))
-        self._compare_to_ref_data(table_data)
-
-    def test_create_csv_file_from_fits(self):
-        """
-        Test the creation of a csv file from a FITS binary table.
-        """
-        self._create_fits_bintable()
-        csv_file = self._create_csv_file()
-        csv_data = []
-        with open(csv_file, 'r') as csv_input:
-            reader = csv.reader(csv_input, delimiter=',')
-            for i, row in enumerate(reader):
-                if i == 0:
-                    colnames = row
-                    continue
-                csv_data.append((row[0], int(row[1]), float(row[2])))
-        self._compare_to_ref_data(csv_data)
-        os.remove(self.fits_file)
-        os.remove(csv_file)
-
     def _create_csv_file(self, csv_file='test_file.csv',
-                         column_mapping=None):
+                         column_mapping=None, fits_hdnum=1):
         """
         Create a csv file from the FITS binary table.
         """
@@ -167,46 +166,63 @@ class PservTestCase(unittest.TestCase):
             column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                           ('int_value', 'INT_VALUE'),
                                           ('float_value', 'FLOAT_VALUE')))
-        desc.pserv.create_csv_file_from_fits(self.fits_file,
-                                             self.fits_hdunum,
+        desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdnum,
                                              csv_file,
                                              column_mapping=column_mapping)
         return csv_file
 
-    def test_incorrect_cvs_mapping(self):
+    def test_create_csv_file_from_fits(self):
         """
-        Test that an incorrect column mapping raises a RuntimeError.
+        Test the creation of a csv file from a FITS binary table.
         """
-        self._create_fits_bintable()
-        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
-                                      ('float_value', 'FLOAT_VALUE'),
-                                      ('int_value', 'INT_VALUE')))
-        csv_file = self._create_csv_file(column_mapping=column_mapping)
-        self.assertRaises(RuntimeError, self.connection.load_csv,
-                          *(self.test_table, csv_file))
-        os.remove(self.fits_file)
-        os.remove(csv_file)
+        csv_file = self.csv_file
+        csv_data = []
+        with open(csv_file, 'r') as csv_input:
+            reader = csv.reader(csv_input, delimiter=',')
+            for i, row in enumerate(reader):
+                if i == 0:
+                    # Skip the header line.
+                    continue
+                csv_data.append((row[0], int(row[1]), float(row[2])))
+        self._compare_to_ref_data(csv_data)
 
     def test_load_csv(self):
         """
         Test that after loading the csv file generated from FITS data,
         a query returns data consistent with the reference data.
         """
-        self._create_fits_bintable()
+        csv_file = self.csv_file
+        table_data = self._query_test_table()
+        self._compare_to_ref_data(table_data)
+
+    def test_incorrect_cvs_mapping(self):
+        """
+        Test that an incorrect column mapping raises a RuntimeError.
+        """
+        # Test incorrect column ordering.
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('int_value', 'INT_VALUE')))
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        self.assertRaises(RuntimeError, self.connection.load_csv,
+                          *(self.test_table, csv_file))
+
+        # Test incorrect column name.
+        column_mapping = OrderedDict((('keyword', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
                                       ('float_value', 'FLOAT_VALUE')))
-        csv_file = 'test_file.csv'
-        desc.pserv.create_csv_file_from_fits(self.fits_file,
-                                             self.fits_hdunum,
-                                             csv_file,
-                                             column_mapping=column_mapping)
-        self.connection.load_csv(self.test_table, csv_file)
-        query = "select keywd, int_value, float_value from %s" % self.test_table
-        table_data = self.connection.apply(
-            query, cursorFunc=lambda curs: tuple(x for x in curs))
-        self._compare_to_ref_data(table_data)
-        os.remove(self.fits_file)
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        self.assertRaises(RuntimeError, self.connection.load_csv,
+                          *(self.test_table, csv_file))
+
+        # Test incorrect number of columns.
+        column_mapping = OrderedDict((('keyword', 'KEYWORD'),
+                                      ('int_value', 'INT_VALUE'),
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('float2_value', 'FLOAT_VALUE')))
+        csv_file = self._create_csv_file(column_mapping=column_mapping)
+        self.assertRaises(RuntimeError, self.connection.load_csv,
+                          *(self.test_table, csv_file))
         os.remove(csv_file)
 
 if __name__ == '__main__':

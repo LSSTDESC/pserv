@@ -1,5 +1,7 @@
 # Pserv: megascale undistributed database
 
+[![Build Status](https://travis-ci.org/DarkEnergyScienceCollaboration/pserv.svg?branch=master)](https://travis-ci.org/DarkEnergyScienceCollaboration/pserv)
+
 This is a package of scripts to set up, maintain, and provide interfaces to a
 very simple "preliminary" or "practice" database which serves LSST data resulting from
 running early versions of the Level 1 and Level 2 pipelines.  A
@@ -11,7 +13,7 @@ The production LSST database will be implemented via
 [`Qserv`](https://github.com/lsst/qserv), which is a distributed
 database implementation with a "MySQL-like" DBMS.  Since
 `Pserv` is meant to emulate `Qserv` but on a single node, a MySQL
-database is used. `Pserv` allows you to start designing and testing 
+database is used. `Pserv` allows you to start designing and testing
 queries on LSST catalogs while `Qserv` is still being developed.
 
 ## People

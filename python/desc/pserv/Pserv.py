@@ -2,10 +2,10 @@
 Pserv: Practice LSST database server code.
 """
 from __future__ import absolute_import, print_function
-from builtins import zip
 import copy
 import csv
 import json
+from builtins import zip
 import astropy.io.fits as fits
 import MySQLdb
 
@@ -77,9 +77,9 @@ class LsstDbConnection(object):
         try:
             cursor.execute(query)
             results = cursorFunc(cursor)
-        except MySQLdb.DatabaseError, message:
+        except MySQLdb.DatabaseError as eobj:
             cursor.close()
-            raise MySQLdb.DatabaseError(message)
+            raise eobj
         cursor.close()
         if cursorFunc is _nullFunc:
             self._mysql_connection.commit()
@@ -118,10 +118,12 @@ class LsstDbConnection(object):
 
     @staticmethod
     def check_column_names(column_names, csv_file):
+        "Check the column names againts those in the csv file."
         with open(csv_file, 'r') as csv_input:
             csv_cols = csv_input.readline().strip().split(',')
         if len(csv_cols) != len(column_names):
-            raise RuntimeError('Number of columns in csv file do not match the number of columns of db table.')
+            raise RuntimeError('Number of columns in csv file do not match '
+                               + 'the number of columns of db table.')
         for csv_col, table_col in zip(csv_cols, column_names):
             if csv_col != table_col:
                 message = 'Column name mismatch between csv file and db table:'
@@ -130,6 +132,7 @@ class LsstDbConnection(object):
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                               column_mapping=None):
+    "Create a csv file from a FITS binary table."
     hdulist = fits.open(fits_file)
     bintable = hdulist[fits_hdunum]
     if column_mapping is None:
