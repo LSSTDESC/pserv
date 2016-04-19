@@ -5,6 +5,7 @@ from __future__ import absolute_import, print_function
 import copy
 import csv
 import json
+from collections import OrderedDict
 from builtins import zip
 import astropy.io.fits as fits
 import MySQLdb
@@ -85,6 +86,15 @@ class LsstDbConnection(object):
             self._mysql_connection.commit()
         return results
 
+    def run_script(self, script, dry_run=False):
+        "Execute a script of sql."
+        with open(script) as script_data:
+            query = ''.join(script_data.readlines())
+        if dry_run:
+            print(query)
+        else:
+            self.apply(query)
+
     def load_csv(self, table_name, csv_file):
         """
         Load a csv file into the specified table.  Non-char data has
@@ -93,7 +103,12 @@ class LsstDbConnection(object):
         # Get the column names and data types.
         query = """SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
                    WHERE TABLE_NAME='%(table_name)s'""" % locals()
-        data_types = self.apply(query, lambda curs: tuple(x for x in curs))
+        def dtype_tuple(curs):
+            dtypes = OrderedDict()
+            for x in curs:
+                dtypes[x] = 1
+            return tuple(dtypes.keys())
+        data_types = self.apply(query, cursorFunc=dtype_tuple)
         query = """LOAD DATA LOCAL INFILE '%(csv_file)s'
                    INTO TABLE %(table_name)s
                    FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n'
