@@ -67,8 +67,8 @@ Source tables with Level 2 pipeline ouput."""
                         help='Do not execute queries')
     args = parser.parse_args()
 
-    connect = desc.pserv.LsstDbConnection(db=args.database,
-                                          read_default_file=args.mysql_config)
+    connect = desc.pserv.DbConnection(db=args.database,
+                                      read_default_file=args.mysql_config)
 
     create_tables(connect, dry_run=args.dry_run)
 

@@ -51,7 +51,7 @@ class PservTestCase(unittest.TestCase):
         """
         Create a connection and test table.
         """
-        self.connection = desc.pserv.LsstDbConnection(**_db_info)
+        self.connection = desc.pserv.DbConnection(**_db_info)
         self.test_table = 'my_test'
         self.data = (('a', 1, 130., 3.1943029977e-24),
                      ('b', 4, 1.4938229e-20, 4.408099891e10),
@@ -80,7 +80,7 @@ class PservTestCase(unittest.TestCase):
         White-box tests of connection pool management.
         """
         num_cobjs = 3
-        connection_objects = [desc.pserv.LsstDbConnection(**_db_info)
+        connection_objects = [desc.pserv.DbConnection(**_db_info)
                               for i in range(num_cobjs)]
         for cobj in connection_objects:
             key = cobj._conn_key
@@ -90,7 +90,7 @@ class PservTestCase(unittest.TestCase):
                              cobj._mysql_connection)
             # self.connection is included in the reference count so
             # subtract it from the current count for the comparison.
-            self.assertEqual(cobj._LsstDbConnection__connection_refs[key] - 1,
+            self.assertEqual(cobj._DbConnection__connection_refs[key] - 1,
                              len(connection_objects))
             cobj_last = connection_objects.pop()
             del cobj_last

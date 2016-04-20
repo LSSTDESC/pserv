@@ -10,7 +10,7 @@ from builtins import zip
 import astropy.io.fits as fits
 import MySQLdb
 
-__all__ = ['LsstDbConnection', 'create_csv_file_from_fits']
+__all__ = ['DbConnection', 'create_csv_file_from_fits']
 
 def _nullFunc(*args):
     """
@@ -19,7 +19,7 @@ def _nullFunc(*args):
     """
     return None
 
-class LsstDbConnection(object):
+class DbConnection(object):
     """
     Class to manage MySQL connections using Borg pattern.
     """
