@@ -6,6 +6,7 @@ from __future__ import absolute_import, print_function
 import os
 import sys
 from warnings import filterwarnings
+from collections import OrderedDict
 import MySQLdb as Database
 import desc.pserv
 import desc.pserv.utils as pserv_utils
@@ -34,6 +35,7 @@ def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
 def ingest_forced_catalogs(connection, repo, dry_run=False):
     "Ingest forced source catalogs into ForcedSource table."
     visits = get_visits(repo)
+    failed_ingests = OrderedDict()
     for band, visit_list in visits.items():
         print("Processing band", band, "for", len(visit_list), "visits.")
         sys.stdout.flush()
@@ -49,8 +51,13 @@ def ingest_forced_catalogs(connection, repo, dry_run=False):
             print("Processing", visit_name)
             sys.stdout.flush()
             if not dry_run:
-                pserv_utils.ingest_ForcedSource_data(connection, catalog_file,
-                                                     ccdVisitId)
+                try:
+                    pserv_utils.ingest_ForcedSource_data(connection,
+                                                         catalog_file,
+                                                         ccdVisitId)
+                except Exception as eobj:
+                    failed_ingests[visit_name] = eobj
+    return failed_ingests
 
 if __name__ == '__main__':
     import argparse
@@ -85,4 +92,5 @@ Source tables with Level 2 pipeline ouput."""
     else:
         pserv_utils.ingest_Object_data(connect, object_catalog)
 
-    ingest_forced_catalogs(connect, args.repo, dry_run=args.dry_run)
+    failures = ingest_forced_catalogs(connect, args.repo, dry_run=args.dry_run)
+    print(failures)
