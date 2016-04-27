@@ -14,6 +14,14 @@ import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
 from .Pserv import DbConnection, create_csv_file_from_fits
 
+def make_ccdVisitId(visit, raft, sensor):
+    """
+    Return an integer that uniquely identifies a visit-raft-sensor
+    combination.
+    """
+    # @todo Include raft and sensor info into the return value.
+    return visit
+
 def ingest_registry(connection, registry_file):
     """
     Ingest some relevant data from a registry.sqlite3 file into
@@ -25,7 +33,8 @@ def ingest_registry(connection, registry_file):
     for row in registry.execute(query):
         taiObs, visit, filter_, raft, ccd, expTime = tuple(row)
         taiObs = taiObs[:len('2016-03-18 00:00:00.000000')]
-        query = """insert into CcdVisit set ccdVisitId=%(visit)i,
+        ccdVisitId = make_ccdVisitId(visit, raft, ccd)
+        query = """insert into CcdVisit set ccdVisitId=%(ccdVisitId)i,
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
                    obsStart='%(taiObs)s'
@@ -42,7 +51,7 @@ def ingest_registry(connection, registry_file):
 def ingest_calexp_info(connection, repo):
     """
     Extract information such as seeing, sky background, sky noise,
-    etc., from the calexp results and insert the values into the
+    etc., from the calexp products and insert the values into the
     CcdVisit table.
     """
     # Use the Butler to find all of the visit/sensor combinations.
@@ -51,10 +60,9 @@ def ingest_calexp_info(connection, repo):
     for dataref in datarefs:
         calexp = dataref.get('calexp')
         calexp_bg = dataref.get('calexpBackground')
-
-        # @todo Need to update this to use a value that takes into account
-        # the raft and sensor info.
-        ccdVisitId = dataref.dataId['visit']
+        ccdVisitId = make_ccdVisitId(dataref.dataId['visit'],
+                                     dataref.dataId['raft'],
+                                     dataref.dataId['sensor'])
 
         # Compute seeing, skyBg, skyNoise column values.
         pixel_scale = calexp.getWcs().pixelScale().asArcseconds()
@@ -65,8 +73,8 @@ def ingest_calexp_info(connection, repo):
         # Retrieving the nominal background image is computationally
         # expensive and just returns an interpolated version of the
         # stats_image (see
-        # https://github.com/lsst/afw/blob/master/src/math/BackgroundMI.cc#L87).
-        # So get the stats image instead.
+        # https://github.com/lsst/afw/blob/master/src/math/BackgroundMI.cc#L87),
+        # so just get the stats image.
         #bg_image = calexp_bg.getImage()
         bg_image = calexp_bg[0][0].getStatsImage()
         skyBg = afwMath.makeStatistics(bg_image, afwMath.MEDIAN).getValue()
