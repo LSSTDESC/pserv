@@ -9,10 +9,9 @@ import numpy as np
 import sqlite3
 import MySQLdb as Database
 import astropy.io.fits as fits
-import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
-from .Pserv import DbConnection, create_csv_file_from_fits
+from .Pserv import create_csv_file_from_fits
 
 def make_ccdVisitId(visit, raft, sensor):
     """
@@ -50,24 +49,32 @@ def ingest_registry(connection, registry_file):
 
 def ingest_calexp_info(connection, repo):
     """
-    Extract information such as seeing, sky background, sky noise,
-    etc., from the calexp products and insert the values into the
-    CcdVisit table.
+    Extract information such as zeroPoint, seeing, sky background, sky
+    noise, etc., from the calexp products and insert the values into
+    the CcdVisit table.
     """
     # Use the Butler to find all of the visit/sensor combinations.
     butler = dp.Butler(repo)
     datarefs = butler.subset('calexp')
+    num_datarefs = len(datarefs)
+    print('Ingesting %i visit/sensor combinations' % num_datarefs)
+    sys.stdout.flush()
+    nrows = 0
     for dataref in datarefs:
+        if nrows % int(num_datarefs/20) == 0:
+            sys.stdout.write('.')
+            sys.stdout.flush()
         calexp = dataref.get('calexp')
         calexp_bg = dataref.get('calexpBackground')
         ccdVisitId = make_ccdVisitId(dataref.dataId['visit'],
                                      dataref.dataId['raft'],
                                      dataref.dataId['sensor'])
 
-        # Compute seeing, skyBg, skyNoise column values.
-        pixel_scale = calexp.getWcs().pixelScale().asArcseconds()
-        # For psf_fwhm (=seeing) calculation, see
+        # Compute zeroPoint, seeing, skyBg, skyNoise column values.
+        zeroPoint = calexp.getCalib().getFluxMag0()[0]
+        # For the psf_fwhm (=seeing) calculation, see
         # https://github.com/lsst/meas_deblender/blob/master/python/lsst/meas/deblender/deblend.py#L227
+        pixel_scale = calexp.getWcs().pixelScale().asArcseconds()
         seeing = (calexp.getPsf().computeShape().getDeterminantRadius()
                   *2.35*pixel_scale)
         # Retrieving the nominal background image is computationally
@@ -79,11 +86,14 @@ def ingest_calexp_info(connection, repo):
         bg_image = calexp_bg[0][0].getStatsImage()
         skyBg = afwMath.makeStatistics(bg_image, afwMath.MEDIAN).getValue()
         skyNoise = afwMath.makeStatistics(calexp.getMaskedImage(),
-                                          afwMath.VARIANCECLIP).getValue()
-        query = """update CcdVisit set seeing=%(seeing)e,
-                   skyBg=%(skyBg)e, skyNoise=%(skyNoise)e
+                                          afwMath.STDEVCLIP).getValue()
+        query = """update CcdVisit set zeroPoint=%(zeroPoint)15.9e,
+                   seeing=%(seeing)15.9e,
+                   skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e
                    where ccdVisitId=%(ccdVisitId)i""" % locals()
         connection.apply(query)
+        nrows += 1
+    print('!')
 
 def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
                              psFlux='base_PsfFlux_flux',
