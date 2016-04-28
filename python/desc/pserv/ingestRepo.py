@@ -8,6 +8,7 @@ import numpy as np
 import lsst.daf.persistence as dp
 from sqlalchemy import create_engine
 
+
 class ExposureData(object):
     def __init__(self, repoPath, outputRoot):
         self.bp = dp.Butler(repoPath, outputRoot=outputRoot)
