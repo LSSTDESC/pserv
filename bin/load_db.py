@@ -82,8 +82,10 @@ Source tables with Level 2 pipeline ouput."""
     registry_file = find_registry(args.repo)
     if args.dry_run:
         print("Ingest registry file", registry_file)
+        print("Ingest calexp info")
     else:
         pserv_utils.ingest_registry(connect, registry_file)
+        pserv_utils.ingest_calexp_info(connect, args.repo)
 
     object_catalog = os.path.join(args.repo, 'deepCoadd-results/merged/0/0,0',
                                   'ref-0-0,0.fits')
