@@ -172,6 +172,5 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                 columns.append(coldata.tolist())
             else: # Assume colname is a numeric constant.
                 columns.append([colname]*nrows)
-        data = zip(*tuple(columns))
-        for row in data:
+        for row in zip(*tuple(columns)):
             writer.writerow(row)
