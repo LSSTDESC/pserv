@@ -7,7 +7,6 @@ import csv
 import unittest
 from collections import OrderedDict
 from warnings import filterwarnings
-from builtins import zip
 import numpy as np
 import astropy.io.fits as fits
 import MySQLdb as Database
