@@ -33,13 +33,21 @@ def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
         create_table(connection, table_name, dry_run=dry_run, clobber=clobber)
 
 def ingest_forced_catalogs(connection, repo, dry_run=False):
-    "Ingest forced source catalogs into ForcedSource table."
+    """
+    Ingest forced source catalogs into ForcedSource table.  The
+    CcdVisit table must be filled first so that the zero point flux
+    can be retrieved.
+    """
     visits = get_visits(repo)
     failed_ingests = OrderedDict()
     for band, visit_list in visits.items():
         print("Processing band", band, "for", len(visit_list), "visits.")
         sys.stdout.flush()
         for ccdVisitId in visit_list:
+            query = 'select zeroPoint from CcdVisit where ccdVisitId=%i' \
+                    % ccdVisitId
+            zeroPoint = connection.apply(query,
+                                         lambda curs: [x[0] for x in curs][0])
             visit_name = 'v%i-f%s' % (ccdVisitId, band)
             #
             # @todo: Generalize this for arbitrary rafts and sensors.
@@ -54,7 +62,8 @@ def ingest_forced_catalogs(connection, repo, dry_run=False):
                 try:
                     pserv_utils.ingest_ForcedSource_data(connection,
                                                          catalog_file,
-                                                         ccdVisitId)
+                                                         ccdVisitId,
+                                                         zeroPoint)
                 except Exception as eobj:
                     failed_ingests[visit_name] = eobj
     return failed_ingests

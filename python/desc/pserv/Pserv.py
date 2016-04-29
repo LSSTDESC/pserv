@@ -6,7 +6,6 @@ import copy
 import csv
 import json
 from collections import OrderedDict
-from builtins import zip
 import astropy.io.fits as fits
 import MySQLdb
 
@@ -150,25 +149,29 @@ class DbConnection(object):
                 raise RuntimeError(message)
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
-                              column_mapping=None):
+                              column_mapping=None, scale_factors=None):
     "Create a csv file from a FITS binary table."
-    hdulist = fits.open(fits_file)
-    bintable = hdulist[fits_hdunum]
+    bintable = fits.open(fits_file)[fits_hdunum]
     if column_mapping is None:
         column_mapping = dict([(coldef.name, coldef.name)
                                for coldef in bintable.columns])
+    if scale_factors is None:
+        scale_factors = {}
     with open(csv_file, 'w') as csv_output:
         writer = csv.writer(csv_output, delimiter=',')
         writer.writerow(list(column_mapping.keys()))
         nrows = bintable.header['NAXIS2']
         columns = []
-        for csv_name, colname in column_mapping.items():
+        for colname in column_mapping.values():
             if isinstance(colname, str):
-                coldata = bintable.data[colname].tolist()
-                columns.append(coldata)
+                coldata = bintable.data[colname]
+                try:
+                    coldata *= scale_factors[colname]
+                except KeyError:
+                    pass
+                columns.append(coldata.tolist())
             else: # Assume colname is a numeric constant.
                 columns.append([colname]*nrows)
         data = zip(*tuple(columns))
         for row in data:
             writer.writerow(row)
-

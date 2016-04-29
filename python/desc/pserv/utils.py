@@ -5,8 +5,8 @@ from __future__ import absolute_import, print_function, division
 import os
 import sys
 from collections import OrderedDict
-import numpy as np
 import sqlite3
+import numpy as np
 import MySQLdb as Database
 import astropy.io.fits as fits
 import lsst.afw.math as afwMath
@@ -95,7 +95,7 @@ def ingest_calexp_info(connection, repo):
         nrows += 1
     print('!')
 
-def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
+def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId, zeroPoint,
                              psFlux='base_PsfFlux_flux',
                              psFlux_Sigma='base_PsfFlux_fluxSigma',
                              flags=0, fits_hdunum=1, csv_file='temp.csv',
@@ -110,16 +110,19 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
                                   ('psFlux', psFlux),
                                   ('psFlux_Sigma', psFlux_Sigma),
                                   ('flags', flags)))
+    # Scale factors to convert from DN to nanomaggies.
+    scale_factors = dict(((psFlux, 1e9/zeroPoint),
+                          (psFlux_Sigma, 1e9/zeroPoint)))
     create_csv_file_from_fits(catalog_file, fits_hdunum, csv_file,
-                              column_mapping=column_mapping)
+                              column_mapping=column_mapping,
+                              scale_factors=scale_factors)
     connection.load_csv('ForcedSource', csv_file)
     if cleanup:
         os.remove(csv_file)
 
 def ingest_Object_data(connection, catalog_file):
     "Ingest the reference catalog from the merged coadds."
-    hdulist = fits.open(catalog_file)
-    data = hdulist[1].data
+    data = fits.open(catalog_file)[1].data
     nobjs = len(data['id'])
     print("Ingesting %i objects" % nobjs)
     sys.stdout.flush()

@@ -28,14 +28,14 @@ def get_db_info():
             # Travis CI usage:
             my_db_info = dict(db='myapp_test', user='travis', host='127.0.0.1')
             test = Database.connect(**my_db_info)
-        except Exception, eobj:
+        except Exception as eobj:
             #print(eobj)
             # User's configuration:
             my_db_info = dict(db='test', read_default_file='~/.my.cnf')
             test = Database.connect(**my_db_info)
         test.close()
         db_info = my_db_info
-    except Exception, eobj:
+    except Exception as eobj:
         print("No database connection:")
         print(eobj)
     return db_info
@@ -127,9 +127,9 @@ class PservTestCase(unittest.TestCase):
         for query_row, ref_row in zip(query_data, self.data):
             self.assertEqual(query_row[0], ref_row[0])
             self.assertEqual(query_row[1], ref_row[1])
-            format = '%.' + str(places) + 'e'
-            fp1 = format % query_row[2]
-            fp2 = format % ref_row[2]
+            format_ = '%.' + str(places) + 'e'
+            fp1 = format_ % query_row[2]
+            fp2 = format_ % ref_row[2]
             self.assertEqual(fp1, fp2)
             #self.assertAlmostEqual(query_row[2], ref_row[2], places=places)
 
@@ -185,7 +185,8 @@ class PservTestCase(unittest.TestCase):
                 if i == 0:
                     # Skip the header line.
                     continue
-                csv_data.append((row[0], int(row[1]), float(row[2])))
+                csv_data.append((row[0], int(row[1]), float(row[2]),
+                                 np.float64(row[3])))
         return csv_data
 
     def test_create_csv_file_from_fits(self):
@@ -213,6 +214,9 @@ class PservTestCase(unittest.TestCase):
             fp1 = '%.5e' % csv_row[2]
             fp2 = '%.5e' % ref_row[2]
             self.assertEqual(fp1, fp2)
+            fp1 = '%.10e' % csv_row[3]
+            fp2 = '%.10e' % ref_row[3]
+            self.assertEqual(fp1, fp2)
 
         float_value = 719.3449
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
@@ -227,6 +231,39 @@ class PservTestCase(unittest.TestCase):
             fp1 = '%.5e' % csv_row[2]
             fp2 = '%.5e' % float_value
             self.assertEqual(fp1, fp2)
+            fp1 = '%.10e' % csv_row[3]
+            fp2 = '%.10e' % ref_row[3]
+            self.assertEqual(fp1, fp2)
+
+    def test_create_csv_file_from_fits_with_column_scaling(self):
+        """
+        Test the creation of a csv file from a FITS binary table with
+        scaling factors (e.g., conversion to nanomaggies using the
+        zero point flux) applied to certain columns.
+        """
+        column_mapping = OrderedDict((('keywd', 'KEYWORD'),
+                                      ('int_value', 'INT_VALUE'),
+                                      ('float_value', 'FLOAT_VALUE'),
+                                      ('double_value', 'DOUBLE_VALUE')))
+        scale_factors = dict((('FLOAT_VALUE', 2.981),
+                              ('DOUBLE_VALUE', 0.321)))
+        csv_file = 'test_file_scaling.csv'
+        fits_hdunum = 1
+        desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdunum,
+                                             csv_file,
+                                             column_mapping=column_mapping,
+                                             scale_factors=scale_factors)
+        csv_data = self._read_csv_file(csv_file)
+        for csv_row, ref_row in zip(csv_data, self.data):
+            self.assertEqual(csv_row[0], ref_row[0])
+            self.assertEqual(csv_row[1], ref_row[1])
+            fp1 = '%.5e' % csv_row[2]
+            fp2 = '%.5e' % (ref_row[2]*scale_factors['FLOAT_VALUE'])
+            self.assertEqual(fp1, fp2)
+            fp1 = '%.10e' % csv_row[3]
+            fp2 = '%.10e' % (ref_row[3]*scale_factors['DOUBLE_VALUE'])
+            self.assertEqual(fp1, fp2)
+        os.remove(csv_file)
 
     def test_load_csv(self):
         """
