@@ -7,13 +7,13 @@ import csv
 import json
 from collections import OrderedDict
 import astropy.io.fits as fits
-import MySQLdb
+import MySQLdb as Database
 
 __all__ = ['DbConnection', 'create_csv_file_from_fits']
 
 def _nullFunc(*args):
     """
-    Default do-nothing function for processing data from a MySQLdb
+    Default do-nothing function for processing data from a Database
     cursor object.
     """
     return None
@@ -58,7 +58,7 @@ class DbConnection(object):
 
         if not self.__connection_pool.has_key(self._conn_key):
             # Create a new mysql connection object.
-            self.__connection_pool[self._conn_key] = MySQLdb.connect(**kwds)
+            self.__connection_pool[self._conn_key] = Database.connect(**kwds)
 
         # Update the reference counts for the connection objects.
         try:
@@ -77,7 +77,7 @@ class DbConnection(object):
         try:
             cursor.execute(query)
             results = cursorFunc(cursor)
-        except MySQLdb.DatabaseError as eobj:
+        except Database.DatabaseError as eobj:
             cursor.close()
             raise eobj
         cursor.close()
