@@ -24,7 +24,7 @@ before_script:
   - mysql -e 'show databases;'
 
 script:
-  - coverage run --source=desc.pserv tests/run_tests.py
+  - nosetests -s --with-coverage --cover-packages=desc.pserv
   - pylint --py3k `find . -name \*.py -print`
 
 after_success:
