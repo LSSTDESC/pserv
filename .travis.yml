@@ -22,10 +22,10 @@ services:
 before_script:
   - mysql -e 'create database myapp_test'
   - mysql -e 'show databases;'
-  - mkdir .lsst
-  - cp tests/db-auth.paf .lsst/db-auth.paf
-  - chmod 700 .lsst
-  - chmod 600 .lsst/db-auth.paf
+  - mkdir /home/travis/.lsst
+  - cp tests/db-auth.paf /home/travis/.lsst/db-auth.paf
+  - chmod 700 /home/travis/.lsst
+  - chmod 600 /home/travis/.lsst/db-auth.paf
 
 script:
   - nosetests -s --with-coverage --cover-package=desc.pserv
