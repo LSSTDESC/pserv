@@ -27,14 +27,16 @@ def get_db_info():
                            host='127.0.0.1', port='3306')
             test = desc.pserv.DbConnection(**db_info)
         except RuntimeError as eobj:
-            #print(eobj)
+            print(eobj)
             # Read the user's default configuration from ~/.my.cnf
             parser = ConfigParser.ConfigParser()
             parser.read(os.path.join(os.environ['HOME'], '.my.cnf'))
             db_info = dict(parser.items('client'))
             db_info['database'] = 'test'
-            del db_info['user']
-            del db_info['password']
+            if db_info.has_key('user'):
+                del db_info['user']
+            if db_info.has_key('password'):
+                del db_info['password']
             test = desc.pserv.DbConnection(**db_info)
     except Exception as eobj:
         print("No database connection:")
