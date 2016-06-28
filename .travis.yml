@@ -24,6 +24,8 @@ before_script:
   - mysql -e 'show databases;'
   - mkdir .lsst
   - cp tests/db-auth.paf .lsst/db-auth.paf
+  - chmod 700 .lsst
+  - chmod 600 .lsst/db-auth.paf
 
 script:
   - nosetests -s --with-coverage --cover-package=desc.pserv
