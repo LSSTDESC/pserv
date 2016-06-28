@@ -7,7 +7,6 @@ import sys
 from collections import OrderedDict
 import sqlite3
 import numpy as np
-import MySQLdb as Database
 import astropy.io.fits as fits
 import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
@@ -43,7 +42,7 @@ def ingest_registry(connection, registry_file):
                    obsStart='%(taiObs)s'""" % locals()
         try:
             connection.apply(query)
-        except Database.DatabaseError as eobj:
+        except Exception as eobj:
             print("query:", query)
             raise eobj
 
