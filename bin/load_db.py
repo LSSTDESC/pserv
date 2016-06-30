@@ -7,13 +7,12 @@ import os
 import sys
 from warnings import filterwarnings
 from collections import OrderedDict
-import MySQLdb as Database
 import desc.pserv
 import desc.pserv.utils as pserv_utils
 from desc.pserv.registry_tools import find_registry, get_visits
 
 # Suppress warnings from database module.
-filterwarnings('ignore', category=Database.Warning)
+filterwarnings('ignore')
 
 def create_table(connection, table_name, dry_run=False, clobber=False):
     """
@@ -75,16 +74,18 @@ if __name__ == '__main__':
 Source tables with Level 2 pipeline ouput."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('repo', help='Repository with Stack output')
+    parser.add_argument('host', help='Host server for the MySQL database')
     parser.add_argument('--database', type=str, default='DESC_Twinkles_Level_2',
                         help='Database to use')
-    parser.add_argument('--mysql_config', type=str, default='~/.my.cnf',
-                        help='MySQL config file')
+    parser.add_argument('--port', type=str, default='3306',
+                        help='Port used by the database host')
     parser.add_argument('--dry_run', default=False, action='store_true',
                         help='Do not execute queries')
     args = parser.parse_args()
 
-    connect = desc.pserv.DbConnection(db=args.database,
-                                      read_default_file=args.mysql_config)
+    connect = desc.pserv.DbConnection(database=args.database,
+                                      host=args.host,
+                                      port=args.port)
 
     create_tables(connect, dry_run=args.dry_run)
 

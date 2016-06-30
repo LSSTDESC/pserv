@@ -7,66 +7,56 @@ import csv
 import json
 from collections import OrderedDict
 import astropy.io.fits as fits
-import MySQLdb as Database
+import sqlalchemy
+import lsst.daf.persistence as dp
 
 __all__ = ['DbConnection', 'create_csv_file_from_fits']
 
 def _nullFunc(*args):
     """
-    Default do-nothing function for processing data from a Database
+    Default do-nothing function for processing data from a DBAPI 2
     cursor object.
     """
     return None
 
 class DbConnection(object):
     """
-    Class to manage MySQL connections using Borg pattern.
+    Class to manage db connections using sqlalchemy and DbAuth.
     """
-    __connection_pool = dict()
-    __connection_refs = dict()
     def __init__(self, **kwds):
         """
         Constructor to make the connection object.
         """
-        kwds['local_infile'] = 1  # enable LOAD LOCAL INFILE
-        self._get_mysql_connection(kwds)
+        if not kwds.has_key('query'): # enable LOAD LOCAL INFILE
+            kwds['query'] = dict()
+        kwds['query']['local_infile'] = 1
+        # Use lsst.daf.persistence.DbAuth to get username and password
+        # from ~/.lsst/db-auth.paf
+        kwds['username'] = dp.DbAuth.username(kwds['host'], str(kwds['port']))
+        kwds['password'] = dp.DbAuth.password(kwds['host'], str(kwds['port']))
 
-    def __del__(self):
-        """
-        Decrement reference counts to the connection object and close
-        it if ref counts is zero.
-        """
-        self.__connection_refs[self._conn_key] -= 1
-        if self.__connection_refs[self._conn_key] == 0:
-            self._mysql_connection.close()
-            del self.__connection_pool[self._conn_key]
-            del self.__connection_refs[self._conn_key]
+        self._get_mysql_connection(kwds)
 
     def _get_mysql_connection(self, kwds_par):
         """
-        Update the connection pool and reference counts, and set the
-        self._mysql_connection reference.
+        Set the self._mysql_connection attribute
         """
         kwds = copy.deepcopy(kwds_par)
         try:
             del kwds['table_name']
         except KeyError:
             pass
-        # Serialize the kwds dict to obtain a hashable key for the
-        # self.__connection_pool and self.__connection_refs dicts.
-        self._conn_key = json.dumps(kwds, sort_keys=True)
-
-        if not self.__connection_pool.has_key(self._conn_key):
-            # Create a new mysql connection object.
-            self.__connection_pool[self._conn_key] = Database.connect(**kwds)
-
-        # Update the reference counts for the connection objects.
         try:
-            self.__connection_refs[self._conn_key] += 1
+            # Always use the 'mysql+mysqldb' driver so remove any
+            # user-specified driver.
+            del kwds['driver']
         except KeyError:
-            self.__connection_refs[self._conn_key] = 1
+            pass
 
-        self._mysql_connection = self.__connection_pool[self._conn_key]
+        # Create a new mysql connection object.
+        db_url = sqlalchemy.engine.url.URL('mysql+mysqldb', **kwds)
+        engine = sqlalchemy.create_engine(db_url)
+        self._mysql_connection = engine.raw_connection()
 
     def apply(self, query, cursorFunc=_nullFunc):
         """
@@ -74,12 +64,8 @@ class DbConnection(object):
         the query results.
         """
         cursor = self._mysql_connection.cursor()
-        try:
-            cursor.execute(query)
-            results = cursorFunc(cursor)
-        except Database.DatabaseError as eobj:
-            cursor.close()
-            raise eobj
+        cursor.execute(query)
+        results = cursorFunc(cursor)
         cursor.close()
         if cursorFunc is _nullFunc:
             self._mysql_connection.commit()

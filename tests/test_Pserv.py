@@ -7,13 +7,12 @@ import csv
 import unittest
 from collections import OrderedDict
 from warnings import filterwarnings
+import ConfigParser
 import numpy as np
 import astropy.io.fits as fits
-import MySQLdb as Database
 import desc.pserv
 
-# Suppress warnings from database module.
-filterwarnings('ignore', category=Database.Warning)
+filterwarnings('ignore')
 
 def get_db_info():
     """
@@ -21,22 +20,28 @@ def get_db_info():
     ~/.my.cnf and return the connection info.  Otherwise, return
     an empty dict, which should skip the tests.
     """
-    db_info = {}
     try:
         try:
             # Travis CI usage:
-            my_db_info = dict(db='myapp_test', user='travis', host='127.0.0.1')
-            test = Database.connect(**my_db_info)
-        except Exception as eobj:
-            #print(eobj)
-            # User's configuration:
-            my_db_info = dict(db='test', read_default_file='~/.my.cnf')
-            test = Database.connect(**my_db_info)
-        test.close()
-        db_info = my_db_info
+            db_info = dict(database='myapp_test', username='travis',
+                           host='127.0.0.1', port='3306')
+            test = desc.pserv.DbConnection(**db_info)
+        except RuntimeError as eobj:
+            print(eobj)
+            # Read the user's default configuration from ~/.my.cnf
+            parser = ConfigParser.ConfigParser()
+            parser.read(os.path.join(os.environ['HOME'], '.my.cnf'))
+            db_info = dict(parser.items('client'))
+            db_info['database'] = 'test'
+            if db_info.has_key('user'):
+                del db_info['user']
+            if db_info.has_key('password'):
+                del db_info['password']
+            test = desc.pserv.DbConnection(**db_info)
     except Exception as eobj:
         print("No database connection:")
         print(eobj)
+        db_info = {}
     return db_info
 
 _db_info = get_db_info()
@@ -73,26 +78,6 @@ class PservTestCase(unittest.TestCase):
             os.remove(self.fits_file)
         if os.path.isfile(self.csv_file):
             os.remove(self.csv_file)
-
-    def test_connection_management(self):
-        """
-        White-box tests of connection pool management.
-        """
-        num_cobjs = 3
-        connection_objects = [desc.pserv.DbConnection(**_db_info)
-                              for i in range(num_cobjs)]
-        for cobj in connection_objects:
-            key = cobj._conn_key
-            # All of the connection objects should be the same since
-            # they were built using the same _db_info dict.
-            self.assertEqual(self.connection._mysql_connection,
-                             cobj._mysql_connection)
-            # self.connection is included in the reference count so
-            # subtract it from the current count for the comparison.
-            self.assertEqual(cobj._DbConnection__connection_refs[key] - 1,
-                             len(connection_objects))
-            cobj_last = connection_objects.pop()
-            del cobj_last
 
     def _create_test_table(self):
         """
