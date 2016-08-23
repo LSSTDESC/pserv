@@ -135,7 +135,8 @@ class DbConnection(object):
                 raise RuntimeError(message)
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
-                              column_mapping=None, scale_factors=None):
+                              column_mapping=None, scale_factors=None,
+                              add_ons=None):
     "Create a csv file from a FITS binary table."
     bintable = fits.open(fits_file)[fits_hdunum]
     if column_mapping is None:
@@ -144,8 +145,14 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
     if scale_factors is None:
         scale_factors = {}
     with open(csv_file, 'w') as csv_output:
-        writer = csv.writer(csv_output, delimiter=',')
-        writer.writerow(list(column_mapping.keys()))
+        writer = csv.writer(csv_output, delimiter=',', lineterminator='\n')
+        colnames = list(column_mapping.keys())
+        add_on_values = []
+        if add_ons is not None:
+            for key, value in add_ons.items():
+                colnames.append(key)
+                add_on_values.append(value)
+        writer.writerow(colnames)
         nrows = bintable.header['NAXIS2']
         columns = []
         for colname in column_mapping.values():
@@ -159,4 +166,4 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
             else: # Assume colname is a numeric constant.
                 columns.append([colname]*nrows)
         for row in zip(*tuple(columns)):
-            writer.writerow(row)
+            writer.writerow(list(row) + add_on_values)

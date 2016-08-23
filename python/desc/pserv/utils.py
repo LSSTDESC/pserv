@@ -17,10 +17,13 @@ def make_ccdVisitId(visit, raft, sensor):
     Return an integer that uniquely identifies a visit-raft-sensor
     combination.
     """
-    # @todo Include raft and sensor info into the return value.
-    return visit
+    # There are around 2.5 million visits in the 10 year survey, so 7
+    # digits should suffice for the visit part.  Prepend the RRSS
+    # combination to that and return as a long int.
+    ccdVisitId = long(raft[:3:2] + sensor[:3:2] + "%07i" % visit)
+    return ccdVisitId
 
-def ingest_registry(connection, registry_file):
+def ingest_registry(connection, registry_file, project):
     """
     Ingest some relevant data from a registry.sqlite3 file into
     the CcdVisit table.
@@ -39,14 +42,14 @@ def ingest_registry(connection, registry_file):
                    on duplicate key update
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
-                   obsStart='%(taiObs)s'""" % locals()
+                   obsStart='%(taiObs)s', project='%(project)s'""" % locals()
         try:
             connection.apply(query)
         except Exception as eobj:
             print("query:", query)
             raise eobj
 
-def ingest_calexp_info(connection, repo):
+def ingest_calexp_info(connection, repo, project):
     """
     Extract information such as zeroPoint, seeing, sky background, sky
     noise, etc., from the calexp products and insert the values into
@@ -88,13 +91,15 @@ def ingest_calexp_info(connection, repo):
                                           afwMath.STDEVCLIP).getValue()
         query = """update CcdVisit set zeroPoint=%(zeroPoint)15.9e,
                    seeing=%(seeing)15.9e,
-                   skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e
+                   skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e,
+                   project='%(project)s'
                    where ccdVisitId=%(ccdVisitId)i""" % locals()
         connection.apply(query)
         nrows += 1
     print('!')
 
-def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId, zeroPoint,
+def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
+                             zeroPoint, project,
                              psFlux='base_PsfFlux_flux',
                              psFlux_Sigma='base_PsfFlux_fluxSigma',
                              flags=0, fits_hdunum=1, csv_file='temp.csv',
@@ -114,12 +119,13 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId, zeroPoint,
                           (psFlux_Sigma, 1e9/zeroPoint)))
     create_csv_file_from_fits(catalog_file, fits_hdunum, csv_file,
                               column_mapping=column_mapping,
-                              scale_factors=scale_factors)
+                              scale_factors=scale_factors,
+                              add_ons=dict(project=project))
     connection.load_csv('ForcedSource', csv_file)
     if cleanup:
         os.remove(csv_file)
 
-def ingest_Object_data(connection, catalog_file):
+def ingest_Object_data(connection, catalog_file, project):
     "Ingest the reference catalog from the merged coadds."
     data = fits.open(catalog_file)[1].data
     nobjs = len(data['id'])
@@ -136,10 +142,10 @@ def ingest_Object_data(connection, catalog_file):
         ra_val = ra*180./np.pi
         dec_val = dec*180./np.pi
         query = """insert into Object
-                   (objectId, parentObjectId, psRa, psDecl)
-                   values (%i, %i, %17.9e, %17.9e)
+                   (objectId, parentObjectId, psRa, psDecl, project)
+                   values (%i, %i, %17.9e, %17.9e, '%s')
                    on duplicate key update psRa=%17.9e, psDecl=%17.9e""" \
-            % (objectId, parent, ra_val, dec_val, ra_val, dec_val)
+            % (objectId, parent, ra_val, dec_val, ra_val, dec_val, project)
         connection.apply(query)
         nrows += 1
     print("!")

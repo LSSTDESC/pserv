@@ -330,5 +330,6 @@ create table Object (
        extendedness FLOAT,
        FLAGS1 BIGINT,
        FLAGS2 BIGINT,
-       primary key (objectId)
+       project CHAR(30),
+       primary key (objectId, project)
        )
