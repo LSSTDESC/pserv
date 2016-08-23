@@ -38,11 +38,11 @@ def ingest_registry(connection, registry_file, project):
         query = """insert into CcdVisit set ccdVisitId=%(ccdVisitId)i,
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
-                   obsStart='%(taiObs)s'
+                   obsStart='%(taiObs)s', project='%(project)s'
                    on duplicate key update
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
-                   obsStart='%(taiObs)s', project='%(project)s'""" % locals()
+                   obsStart='%(taiObs)s'""" % locals()
         try:
             connection.apply(query)
         except Exception as eobj:
@@ -91,9 +91,9 @@ def ingest_calexp_info(connection, repo, project):
                                           afwMath.STDEVCLIP).getValue()
         query = """update CcdVisit set zeroPoint=%(zeroPoint)15.9e,
                    seeing=%(seeing)15.9e,
-                   skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e,
-                   project='%(project)s'
-                   where ccdVisitId=%(ccdVisitId)i""" % locals()
+                   skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e
+                   where ccdVisitId=%(ccdVisitId)i and
+                   project='%(project)s'""" % locals()
         connection.apply(query)
         nrows += 1
     print('!')
