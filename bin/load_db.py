@@ -31,7 +31,7 @@ def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
     for table_name in tables:
         create_table(connection, table_name, dry_run=dry_run, clobber=clobber)
 
-def ingest_forced_catalogs(connection, repo, dry_run=False):
+def ingest_forced_catalogs(connection, repo, project, dry_run=False):
     """
     Ingest forced source catalogs into ForcedSource table.  The
     CcdVisit table must be filled first so that the zero point flux
@@ -62,7 +62,8 @@ def ingest_forced_catalogs(connection, repo, dry_run=False):
                     pserv_utils.ingest_ForcedSource_data(connection,
                                                          catalog_file,
                                                          ccdVisitId,
-                                                         zeroPoint)
+                                                         zeroPoint,
+                                                         project)
                 except Exception as eobj:
                     failed_ingests[visit_name] = eobj
     return failed_ingests
@@ -71,10 +72,11 @@ if __name__ == '__main__':
     import argparse
 
     description = """Script to create and load CcdVisit, Object, and Forced
-Source tables with Level 2 pipeline ouput."""
+Source tables with Level 2 pipeline output."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('repo', help='Repository with Stack output')
     parser.add_argument('host', help='Host server for the MySQL database')
+    parser.add_argument('project', help='DESC project name')
     parser.add_argument('--database', type=str, default='DESC_Twinkles_Level_2',
                         help='Database to use')
     parser.add_argument('--port', type=str, default='3306',
@@ -94,15 +96,16 @@ Source tables with Level 2 pipeline ouput."""
         print("Ingest registry file", registry_file)
         print("Ingest calexp info")
     else:
-        pserv_utils.ingest_registry(connect, registry_file)
-        pserv_utils.ingest_calexp_info(connect, args.repo)
+        pserv_utils.ingest_registry(connect, registry_file, args.project)
+        pserv_utils.ingest_calexp_info(connect, args.repo, args.project)
 
     object_catalog = os.path.join(args.repo, 'deepCoadd-results/merged/0/0,0',
                                   'ref-0-0,0.fits')
     if args.dry_run:
         print("Ingest object catalog", object_catalog)
     else:
-        pserv_utils.ingest_Object_data(connect, object_catalog)
+        pserv_utils.ingest_Object_data(connect, object_catalog, args.project)
 
-    failures = ingest_forced_catalogs(connect, args.repo, dry_run=args.dry_run)
+    failures = ingest_forced_catalogs(connect, args.repo, args.project,
+                                      dry_run=args.dry_run)
     print(failures)
