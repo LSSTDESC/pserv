@@ -265,7 +265,7 @@ class PservTestCase(unittest.TestCase):
         table_data = self._query_test_table()
         self._compare_to_ref_data(table_data)
 
-    def test_incorrect_cvs_mapping(self):
+    def test_incorrect_csv_mapping(self):
         """
         Test that an incorrect column mapping raises a RuntimeError.
         """

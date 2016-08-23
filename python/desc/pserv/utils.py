@@ -19,8 +19,8 @@ def make_ccdVisitId(visit, raft, sensor):
     """
     # There are around 2.5 million visits in the 10 year survey, so 7
     # digits should suffice for the visit part.  Prepend the RRSS
-    # combination to that and return as a long int.
-    ccdVisitId = long(raft[:3:2] + sensor[:3:2] + "%07i" % visit)
+    # combination to that and return as an int.
+    ccdVisitId = int(raft[:3:2] + sensor[:3:2] + "%07i" % visit)
     return ccdVisitId
 
 def ingest_registry(connection, registry_file, project):
