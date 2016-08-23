@@ -145,7 +145,7 @@ def ingest_Object_data(connection, catalog_file, project):
                    (objectId, parentObjectId, psRa, psDecl, project)
                    values (%i, %i, %17.9e, %17.9e, '%s')
                    on duplicate key update psRa=%17.9e, psDecl=%17.9e""" \
-            % (objectId, parent, ra_val, dec_val, ra_val, dec_val, project)
+            % (objectId, parent, ra_val, dec_val, project, ra_val, dec_val)
         connection.apply(query)
         nrows += 1
     print("!")
