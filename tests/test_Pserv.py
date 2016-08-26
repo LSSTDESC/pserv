@@ -57,10 +57,11 @@ class PservTestCase(unittest.TestCase):
         """
         self.connection = desc.pserv.DbConnection(**_db_info)
         self.test_table = 'my_test'
-        self.data = (('a', 1, 130., 3.1943029977e-24),
-                     ('b', 4, 1.4938229e-20, 4.408099891e10),
-                     ('c', 100, np.pi, np.pi),
-                     ('d', 3, 4.9039542e20, 9.487982348e30))
+        self.project = 'my project'
+        self.data = (('a', 1, 130., 3.1943029977e-24, self.project),
+                     ('b', 4, 1.4938229e-20, 4.408099891e10, self.project),
+                     ('c', 100, np.pi, np.pi, self.project),
+                     ('d', 3, 4.9039542e20, 9.487982348e30, self.project))
         self._create_test_table()
         # FITS/csv related set up:
         self.fits_file = 'my_test_data.fits'
@@ -85,7 +86,8 @@ class PservTestCase(unittest.TestCase):
         """
         self.connection.apply('drop table if exists %s;' % self.test_table)
         query = """create table %s (keywd char(1), int_value int,
-                   float_value float, double_value double);""" % self.test_table
+                   float_value float, double_value double,
+                   project char(30));""" % self.test_table
         self.connection.apply(query)
 
     def _fill_test_table(self):
@@ -93,7 +95,7 @@ class PservTestCase(unittest.TestCase):
         Fill the test db table with key/value pairs from self.data.
         """
         table_name = self.test_table
-        values = ','.join(["('%s', %i, %e, %e)" % row
+        values = ','.join(["('%s', %i, %e, %e, '%s')" % row
                            for row in self.data]) + ';'
         query = "insert into %(table_name)s values %(values)s" % locals()
         self.connection.apply(query)
@@ -102,7 +104,8 @@ class PservTestCase(unittest.TestCase):
         """
         Query for the test table contents.
         """
-        query = "select keywd, int_value, float_value from %s" % self.test_table
+        query = """select keywd, int_value, float_value, double_value,
+                   project from %s""" % self.test_table
         return self.connection.apply(
             query, cursorFunc=lambda curs: tuple(x for x in curs))
 
@@ -115,6 +118,7 @@ class PservTestCase(unittest.TestCase):
             fp1 = format_ % query_row[2]
             fp2 = format_ % ref_row[2]
             self.assertEqual(fp1, fp2)
+            self.assertEqual(query_row[4], self.project)
             #self.assertAlmostEqual(query_row[2], ref_row[2], places=places)
 
     def test_apply_cursorFunc(self):
@@ -157,7 +161,8 @@ class PservTestCase(unittest.TestCase):
                                           ('double_value', 'DOUBLE_VALUE')))
         desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdnum,
                                              csv_file,
-                                             column_mapping=column_mapping)
+                                             column_mapping=column_mapping,
+                                             add_ons=dict(project=self.project))
         return csv_file
 
     @staticmethod
@@ -170,7 +175,7 @@ class PservTestCase(unittest.TestCase):
                     # Skip the header line.
                     continue
                 csv_data.append((row[0], int(row[1]), float(row[2]),
-                                 np.float64(row[3])))
+                                 np.float64(row[3]), row[4]))
         return csv_data
 
     def test_create_csv_file_from_fits(self):
@@ -236,7 +241,8 @@ class PservTestCase(unittest.TestCase):
         desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdunum,
                                              csv_file,
                                              column_mapping=column_mapping,
-                                             scale_factors=scale_factors)
+                                             scale_factors=scale_factors,
+                                             add_ons=dict(project=self.project))
         csv_data = self._read_csv_file(csv_file)
         for csv_row, ref_row in zip(csv_data, self.data):
             self.assertEqual(csv_row[0], ref_row[0])
@@ -259,7 +265,7 @@ class PservTestCase(unittest.TestCase):
         table_data = self._query_test_table()
         self._compare_to_ref_data(table_data)
 
-    def test_incorrect_cvs_mapping(self):
+    def test_incorrect_csv_mapping(self):
         """
         Test that an incorrect column mapping raises a RuntimeError.
         """

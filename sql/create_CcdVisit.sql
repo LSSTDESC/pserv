@@ -31,5 +31,6 @@ create table CcdVisit (
        skyBg FLOAT,
        skyNoise FLOAT,
        flags INTEGER,
-       primary key (ccdVisitId)
+       project CHAR(30),
+       primary key (ccdVisitId, project)
        )

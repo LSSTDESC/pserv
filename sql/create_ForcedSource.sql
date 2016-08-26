@@ -4,5 +4,6 @@ create table ForcedSource (
        psFlux FLOAT,
        psFlux_Sigma FLOAT,
        flags TINYINT,
-       primary key (objectId, ccdVisitID)
+       project CHAR(30),
+       primary key (objectId, ccdVisitID, project)
        )
