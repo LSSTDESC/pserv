@@ -17,19 +17,20 @@ def ingest_forced_src_extras(connection, repo_info, project, tract=0,
                              fits_hdunum=1, csv_file='temp.csv',
                              dry_run=True):
     column_mapping =\
-        OrderedDict(objectId='objectId',
-                    ccdVisitId=None,
-                    ap_3_0_Flux='base_CircularApertureFlux_3_0_flux',
-                    ap_3_0_Flux_Sigma='base_CircularApertureFlux_3_0_fluxSigma',
-                    ap_9_0_Flux='base_CircularApertureFlux_9_0_flux',
-                    ap_9_0_Flux_Sigma='base_CircularApertureFlux_9_0_fluxSigma',
-                    ap_25_0_Flux='base_CircularApertureFlux_25_0_flux',
-                    ap_25_0_Flux_Sigma='base_CircularApertureFlux_25_0_fluxSigma',
-                    psf_apCorr_Flux='base_psfFlux_apCorr_flux',
-                    psf_apCorr_Flux_Sigma='base_psfFlux_apCorr_fluxSigma',
-                    gauss_apCorr_Flux='gaussFlux_apCorr_flux',
-                    gauss_apCorr_Flux_Sigma='gaussFlux_apCorr_fluxSigma',
-                    flags=0, project=project)
+        OrderedDict((('objectId', 'objectId'),
+                     ('ccdVisitId', None),
+                     ('ap_3_0_Flux', 'base_CircularApertureFlux_3_0_flux'),
+                     ('ap_3_0_Flux_Sigma', 'base_CircularApertureFlux_3_0_fluxSigma'),
+                     ('ap_9_0_Flux', 'base_CircularApertureFlux_9_0_flux'),
+                     ('ap_9_0_Flux_Sigma', 'base_CircularApertureFlux_9_0_fluxSigma'),
+                     ('ap_17_0_Flux', 'base_CircularApertureFlux_17_0_flux'),
+                     ('ap_17_0_Flux_Sigma', 'base_CircularApertureFlux_17_0_fluxSigma'),
+                     ('ap_25_0_Flux', 'base_CircularApertureFlux_25_0_flux'),
+                     ('ap_25_0_Flux_Sigma', 'base_CircularApertureFlux_25_0_fluxSigma'),
+                     ('ap_50_0_Flux', 'base_CircularApertureFlux_50_0_flux'),
+                     ('ap_50_0_Flux_Sigma', 'base_CircularApertureFlux_50_0_fluxSigma'),
+                     ('flags', 0),
+                     ('project', project)))
     visits = repo_info.get_visits()
     sensors = repo_info.get_sensors()
     failed_ingests = OrderedDict()
@@ -52,16 +53,18 @@ def ingest_forced_src_extras(connection, repo_info, project, tract=0,
                 callbacks = {}
                 for value in column_mapping.values():
                     callbacks[value] = flux_calibrator
-                    catalog_file = os.path.join(repo, 'forced', str(tract),
-                                                visit_name, 'R'+raft[:3:2],
+                    catalog_file = os.path.join(repo_info.repo, 'forced',
+                                                str(tract), visit_name,
+                                                'R'+raft[:3:2],
                                                 'S'+sensor[:3:2]+'.fits')
                 if not dry_run:
                     try:
-                        create_csv_file_from_fits(catalog_file, fits_hdunum,
-                                                  csv_file,
-                                                  column_mapping=column_mapping,
-                                                  callbacks=callbacks)
-                        connection.load_csv('ForceSourceExtras', csv_file)
+                        desc.pserv.create_csv_file_from_fits(catalog_file,
+                                                             fits_hdunum,
+                                                             csv_file,
+                                                             column_mapping=column_mapping,
+                                                             callbacks=callbacks)
+                        connection.load_csv('ForcedSourceExtra', csv_file)
                         try:
                             os.remove(csv_file)
                         except OSerror:

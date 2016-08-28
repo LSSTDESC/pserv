@@ -71,7 +71,7 @@ class FluxCalibrator(object):
             Source flux(es) in nanomaggies.
         """
         try:
-            return np.array([self.get_nanomaggies(flux) for x in flux])
+            return np.array([self.get_nanomaggies(x) for x in flux])
         except TypeError:
             return self.get_nanomaggies(flux)
 

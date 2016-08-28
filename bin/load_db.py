@@ -43,8 +43,9 @@ def ingest_forced_catalogs(connection, repo_info, project, tract=0,
                                              lambda c: [x[0] for x in c][0])
                 flux_calibrator = pserv_utils.FluxCalibrator(zeroPoint)
                 visit_name = 'v%i-f%s' % (visitId, band)
-                catalog_file = os.path.join(repo, 'forced', str(tract),
-                                            visit_name, 'R'+raft[:3:2],
+                catalog_file = os.path.join(repo_info.repo, 'forced',
+                                            str(tract), visit_name,
+                                            'R'+raft[:3:2],
                                             'S'+sensor[:3:2]+'.fits')
                 print("Processing", visit_name, 'R'+raft, 'S'+sensor)
                 sys.stdout.flush()
@@ -99,8 +100,9 @@ Source tables with Level 2 pipeline output."""
     for tract, patch_list in patches.items():
         for patch in patch_list:
             object_catalog \
-                = os.path.join(args.repo, 'deepCoadd-results/merged', tract,
-                               patch, 'ref-%(tract)s-%(patch)s.fits' % locals())
+                = os.path.join(args.repo, 'deepCoadd-results/merged',
+                               str(tract), patch,
+                               'ref-%(tract)s-%(patch)s.fits' % locals())
             if args.dry_run:
                 print("Ingest object catalog", object_catalog)
             else:

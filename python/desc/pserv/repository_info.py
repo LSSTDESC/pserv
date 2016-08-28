@@ -4,6 +4,8 @@ respository.
 '''
 from __future__ import absolute_import, print_function
 import os
+import pickle
+import itertools
 from collections import OrderedDict
 import sqlite3
 import astropy.time
@@ -54,7 +56,7 @@ class RepositoryInfo(object):
         str
             Absolute path to the registry file.
         """
-        basePath = os.path.abspath(data_repo)
+        basePath = os.path.abspath(repo)
         while not os.path.exists(os.path.join(basePath, registry_name)):
             if os.path.exists(os.path.join(basePath, "_parent")):
                 basePath = os.path.join(basePath, "_parent")
@@ -132,6 +134,6 @@ class RepositoryInfo(object):
         for tract_info in skymap:
             nx, ny = [tract_info.getNumPatches()[i] for i in (0, 1)]
             patches[tract_info.getId()] = ('%i,%i' % x for x in
-                                           itertools.product(range(nx),
-                                                             range(ny)))
+                                           itertools.product(list(range(nx)),
+                                                             list(range(ny))))
         return patches

@@ -139,8 +139,8 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
     "Create a csv file from a FITS binary table."
     bintable = fits.open(fits_file)[fits_hdunum]
     if column_mapping is None:
-        column_mapping = dict([(coldef.name, coldef.name)
-                               for coldef in bintable.columns])
+        column_mapping = OrderedDict([(coldef.name, coldef.name)
+                                      for coldef in bintable.columns])
     if callbacks is None:
         callbacks = {}
     with open(csv_file, 'w') as csv_output:
