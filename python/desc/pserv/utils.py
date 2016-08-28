@@ -10,7 +10,70 @@ import numpy as np
 import astropy.io.fits as fits
 import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
+import lsst.utils as lsstUtils
 from .Pserv import create_csv_file_from_fits
+
+__all__ = ['FluxCalibrator', 'make_ccdVisitId', 'create_table',
+           'ingest_registry', 'ingest_calexp_info',
+           'ingest_ForcedSource_data', 'ingest_Object_data']
+
+class FluxCalibrator(object):
+    """
+    Functor class to convert uncalibrated fluxes from a given exposure
+    to nanomaggies.
+
+    Parameters
+    ----------
+    zeroPoint : float
+        Zero point in ADU for the exposure in question.
+
+    Attributes
+    ----------
+    zeroPoint : float
+        Zero point in ADU for the exposure in question.
+
+    """
+    def __init__(self, zeroPoint):
+        "Class constructor"
+        self.zeroPoint = zeroPoint
+
+    def get_nanomaggies(self, flux):
+        """
+        Convert flux to nanomaggies.
+
+        Parameters
+        ----------
+        flux : float
+            Measure source flux in ADU.
+
+        Returns
+        -------
+        float
+            Source flux in nanomaggies.
+        """
+        if flux > 0:
+            return 1e9*flux/self.zeroPoint
+        else:
+            return np.nan
+
+    def __call__(self, flux):
+        """
+        Convert flux to nanomaggies.
+
+        Parameters
+        ----------
+        flux : float or sequence
+            Measure source flux(es) in ADU.
+
+        Returns
+        -------
+        float or np.array
+            Source flux(es) in nanomaggies.
+        """
+        try:
+            return np.array([self.get_nanomaggies(flux) for x in flux])
+        except TypeError:
+            return self.get_nanomaggies(flux)
 
 def make_ccdVisitId(visit, raft, sensor):
     """
@@ -22,6 +85,17 @@ def make_ccdVisitId(visit, raft, sensor):
     # combination to that and return as an int.
     ccdVisitId = int(raft[:3:2] + sensor[:3:2] + "%07i" % visit)
     return ccdVisitId
+
+def create_table(connection, table_name, dry_run=False, clobber=False):
+    """
+    Create the specified table using the corresponding script in the
+    sql subfolder.
+    """
+    if clobber and not dry_run:
+        connection.apply('drop table if exists %s' % table_name)
+    create_script = os.path.join(lsstUtils.getPackageDir('pserv'), 'sql',
+                                 'create_%s.sql' % table_name)
+    connection.run_script(create_script, dry_run=dry_run)
 
 def ingest_registry(connection, registry_file, project):
     """
@@ -149,3 +223,4 @@ def ingest_Object_data(connection, catalog_file, project):
         connection.apply(query)
         nrows += 1
     print("!")
+
