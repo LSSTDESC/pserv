@@ -158,11 +158,11 @@ class PservTestCase(unittest.TestCase):
             column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                           ('int_value', 'INT_VALUE'),
                                           ('float_value', 'FLOAT_VALUE'),
-                                          ('double_value', 'DOUBLE_VALUE')))
+                                          ('double_value', 'DOUBLE_VALUE'),
+                                          ('project', self.project)))
         desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdnum,
                                              csv_file,
-                                             column_mapping=column_mapping,
-                                             add_ons=dict(project=self.project))
+                                             column_mapping=column_mapping)
         return csv_file
 
     @staticmethod
@@ -194,7 +194,8 @@ class PservTestCase(unittest.TestCase):
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('int_value', int_value),
                                       ('float_value', 'FLOAT_VALUE'),
-                                      ('double_value', 'DOUBLE_VALUE')))
+                                      ('double_value', 'DOUBLE_VALUE'),
+                                      ('project', self.project)))
         csv_file = self._create_csv_file(column_mapping=column_mapping)
         csv_data = self._read_csv_file(csv_file)
         for csv_row, ref_row in zip(csv_data, self.data):
@@ -211,7 +212,8 @@ class PservTestCase(unittest.TestCase):
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
                                       ('float_value', float_value),
-                                      ('double_value', 'DOUBLE_VALUE')))
+                                      ('double_value', 'DOUBLE_VALUE'),
+                                      ('project', self.project)))
         csv_file = self._create_csv_file(column_mapping=column_mapping)
         csv_data = self._read_csv_file(csv_file)
         for csv_row, ref_row in zip(csv_data, self.data):
@@ -224,34 +226,34 @@ class PservTestCase(unittest.TestCase):
             fp2 = '%.10e' % ref_row[3]
             self.assertEqual(fp1, fp2)
 
-    def test_create_csv_file_from_fits_with_column_scaling(self):
+    def test_create_csv_file_from_fits_with_callbacks(self):
         """
         Test the creation of a csv file from a FITS binary table with
-        scaling factors (e.g., conversion to nanomaggies using the
-        zero point flux) applied to certain columns.
+        callback functions applied (e.g., conversion to nanomaggies
+        using the zero point flux) applied to certain columns.
         """
         column_mapping = OrderedDict((('keywd', 'KEYWORD'),
                                       ('int_value', 'INT_VALUE'),
                                       ('float_value', 'FLOAT_VALUE'),
-                                      ('double_value', 'DOUBLE_VALUE')))
-        scale_factors = dict((('FLOAT_VALUE', 2.981),
-                              ('DOUBLE_VALUE', 0.321)))
+                                      ('double_value', 'DOUBLE_VALUE'),
+                                      ('project', self.project)))
+        callbacks = dict((('FLOAT_VALUE', lambda x: 2.981*x),
+                          ('DOUBLE_VALUE', lambda x: 0.321*x)))
         csv_file = 'test_file_scaling.csv'
         fits_hdunum = 1
         desc.pserv.create_csv_file_from_fits(self.fits_file, fits_hdunum,
                                              csv_file,
                                              column_mapping=column_mapping,
-                                             scale_factors=scale_factors,
-                                             add_ons=dict(project=self.project))
+                                             callbacks=callbacks)
         csv_data = self._read_csv_file(csv_file)
         for csv_row, ref_row in zip(csv_data, self.data):
             self.assertEqual(csv_row[0], ref_row[0])
             self.assertEqual(csv_row[1], ref_row[1])
             fp1 = '%.5e' % csv_row[2]
-            fp2 = '%.5e' % (ref_row[2]*scale_factors['FLOAT_VALUE'])
+            fp2 = '%.5e' % (callbacks['FLOAT_VALUE'](ref_row[2]))
             self.assertEqual(fp1, fp2)
             fp1 = '%.10e' % csv_row[3]
-            fp2 = '%.10e' % (ref_row[3]*scale_factors['DOUBLE_VALUE'])
+            fp2 = '%.10e' % (callbacks['DOUBLE_VALUE'](ref_row[3]))
             self.assertEqual(fp1, fp2)
         os.remove(csv_file)
 

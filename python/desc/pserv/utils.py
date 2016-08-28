@@ -99,7 +99,7 @@ def ingest_calexp_info(connection, repo, project):
     print('!')
 
 def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
-                             zeroPoint, project,
+                             flux_calibration, project,
                              psFlux='base_PsfFlux_flux',
                              psFlux_Sigma='base_PsfFlux_fluxSigma',
                              flags=0, fits_hdunum=1, csv_file='temp.csv',
@@ -113,14 +113,14 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
                                   ('ccdVisitId', ccdVisitId),
                                   ('psFlux', psFlux),
                                   ('psFlux_Sigma', psFlux_Sigma),
-                                  ('flags', flags)))
-    # Scale factors to convert from DN to nanomaggies.
-    scale_factors = dict(((psFlux, 1e9/zeroPoint),
-                          (psFlux_Sigma, 1e9/zeroPoint)))
+                                  ('flags', flags),
+                                  ('project', project)))
+    # Callbacks to apply calibration and convert to nanomaggies.
+    callbacks = dict(((psFlux, flux_calibration),
+                      (psFlux_Sigma, flux_calibration)))
     create_csv_file_from_fits(catalog_file, fits_hdunum, csv_file,
                               column_mapping=column_mapping,
-                              scale_factors=scale_factors,
-                              add_ons=dict(project=project))
+                              callbacks=callbacks)
     connection.load_csv('ForcedSource', csv_file)
     if cleanup:
         os.remove(csv_file)

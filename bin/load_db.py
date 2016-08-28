@@ -32,7 +32,7 @@ def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
         create_table(connection, table_name, dry_run=dry_run, clobber=clobber)
 
 def ingest_forced_catalogs(connection, repo, project, raft='2,2',
-                           sensor='1,1', dry_run=False):
+                           sensor='1,1', tract=0, dry_run=False):
     """
     Ingest forced source catalogs into ForcedSource table.  The
     CcdVisit table must be filled first so that the zero point flux
@@ -46,14 +46,21 @@ def ingest_forced_catalogs(connection, repo, project, raft='2,2',
         for visitId in visit_list:
             ccdVisitId = pserv_utils.make_ccdVisitId(visitId, raft, sensor)
             query = 'select zeroPoint from CcdVisit where ccdVisitId=%i' \
-                    % ccdVisitId
+                % ccdVisitId
             zeroPoint = connection.apply(query,
                                          lambda curs: [x[0] for x in curs][0])
+            def flux_calibration(flux):
+                def get_nanomaggies(flux):
+                    if flux > 0:
+                        return 1e9*flux/zeroPoint
+                    else:
+                        return np.nan
+                try:
+                    return np.array([get_nanomaggies(x) for x in flux])
+                except TypeError:
+                    return get_nanomaggies(flux)
             visit_name = 'v%i-f%s' % (visitId, band)
-            #
-            # @todo: Generalize this for tract values other than '0'.
-            #
-            catalog_file = os.path.join(repo, 'forced', '0',
+            catalog_file = os.path.join(repo, 'forced', str(tract),
                                         visit_name, 'R'+raft[:3:2],
                                         'S'+sensor[:3:2]+'.fits')
             print("Processing", visit_name)
@@ -63,7 +70,7 @@ def ingest_forced_catalogs(connection, repo, project, raft='2,2',
                     pserv_utils.ingest_ForcedSource_data(connection,
                                                          catalog_file,
                                                          ccdVisitId,
-                                                         zeroPoint,
+                                                         flux_calibration,
                                                          project)
                 except Exception as eobj:
                     failed_ingests[visit_name] = eobj
