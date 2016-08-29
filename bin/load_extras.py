@@ -52,11 +52,12 @@ def ingest_forced_src_extras(connection, repo_info, project, tract=0,
                 flux_calibrator = pserv_utils.FluxCalibrator(zeroPoint)
                 callbacks = {}
                 for value in column_mapping.values():
-                    callbacks[value] = flux_calibrator
-                    catalog_file = os.path.join(repo_info.repo, 'forced',
-                                                str(tract), visit_name,
-                                                'R'+raft[:3:2],
-                                                'S'+sensor[:3:2]+'.fits')
+                    if str(value).startswith('base_'):
+                        callbacks[value] = flux_calibrator
+                catalog_file = os.path.join(repo_info.repo, 'forced',
+                                            str(tract), visit_name,
+                                            'R'+raft[:3:2],
+                                            'S'+sensor[:3:2]+'.fits')
                 if not dry_run:
                     try:
                         desc.pserv.create_csv_file_from_fits(catalog_file,
