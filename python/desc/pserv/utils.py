@@ -51,10 +51,11 @@ class FluxCalibrator(object):
         float
             Source flux in nanomaggies.
         """
-        if flux > 0:
-            return 1e9*flux/self.zeroPoint
-        else:
-            return np.nan
+        return 1e9*flux/self.zeroPoint
+#        if flux > 0:
+#            return 1e9*flux/self.zeroPoint
+#        else:
+#            return np.nan
 
     def __call__(self, flux):
         """
