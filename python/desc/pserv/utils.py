@@ -207,20 +207,27 @@ def ingest_Object_data(connection, catalog_file, project):
     print("Ingesting %i objects" % nobjs)
     sys.stdout.flush()
     nrows = 0
-    for objectId, ra, dec, parent in zip(data['id'],
-                                         data['coord_ra'],
-                                         data['coord_dec'],
-                                         data['parent']):
+    for objectId, ra, dec, parent, extendedness \
+            in zip(data['id'],
+                   data['coord_ra'],
+                   data['coord_dec'],
+                   data['parent'],
+                   data['base_ClassificationExtendedness_value']):
         if nrows % int(nobjs/20) == 0:
             sys.stdout.write('.')
             sys.stdout.flush()
         ra_val = ra*180./np.pi
         dec_val = dec*180./np.pi
+        if np.isnan(extendedness):
+            extendedness = 1.
         query = """insert into Object
-                   (objectId, parentObjectId, psRa, psDecl, project)
-                   values (%i, %i, %17.9e, %17.9e, '%s')
-                   on duplicate key update psRa=%17.9e, psDecl=%17.9e""" \
-            % (objectId, parent, ra_val, dec_val, project, ra_val, dec_val)
+                   (objectId, parentObjectId, psRa, psDecl, extendedness,
+                   project)
+                   values (%i, %i, %17.9e, %17.9e, %17.9e, '%s')
+                   on duplicate key update psRa=%17.9e, psDecl=%17.9e,
+                   extendedness=%17.9e""" \
+            % (objectId, parent, ra_val, dec_val, extendedness, project,
+               ra_val, dec_val, extendedness)
         connection.apply(query)
         nrows += 1
     print("!")

@@ -133,7 +133,7 @@ class RepositoryInfo(object):
         patches = {}
         for tract_info in skymap:
             nx, ny = [tract_info.getNumPatches()[i] for i in (0, 1)]
-            patches[tract_info.getId()] = ('%i,%i' % x for x in
-                                           itertools.product(list(range(nx)),
-                                                             list(range(ny))))
+            patches[tract_info.getId()] = \
+                list('%i,%i' % x for x in itertools.product(list(range(nx)),
+                                                            list(range(ny))))
         return patches
