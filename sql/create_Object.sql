@@ -1,4 +1,4 @@
-create table Object (
+create table if not exists Object (
        objectId BIGINT,
        parentObjectId BIGINT,
        prv_inputId INT,

@@ -10,7 +10,71 @@ import numpy as np
 import astropy.io.fits as fits
 import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
+import lsst.utils as lsstUtils
 from .Pserv import create_csv_file_from_fits
+
+__all__ = ['FluxCalibrator', 'make_ccdVisitId', 'create_table',
+           'ingest_registry', 'ingest_calexp_info',
+           'ingest_ForcedSource_data', 'ingest_Object_data']
+
+class FluxCalibrator(object):
+    """
+    Functor class to convert uncalibrated fluxes from a given exposure
+    to nanomaggies.
+
+    Parameters
+    ----------
+    zeroPoint : float
+        Zero point in ADU for the exposure in question.
+
+    Attributes
+    ----------
+    zeroPoint : float
+        Zero point in ADU for the exposure in question.
+
+    """
+    def __init__(self, zeroPoint):
+        "Class constructor"
+        self.zeroPoint = zeroPoint
+
+    def get_nanomaggies(self, flux):
+        """
+        Convert flux to nanomaggies.
+
+        Parameters
+        ----------
+        flux : float
+            Measure source flux in ADU.
+
+        Returns
+        -------
+        float
+            Source flux in nanomaggies.
+        """
+        return 1e9*flux/self.zeroPoint
+#        if flux > 0:
+#            return 1e9*flux/self.zeroPoint
+#        else:
+#            return np.nan
+
+    def __call__(self, flux):
+        """
+        Convert flux to nanomaggies.
+
+        Parameters
+        ----------
+        flux : float or sequence
+            Measure source flux(es) in ADU.
+
+        Returns
+        -------
+        float or np.array
+            Source flux(es) in nanomaggies.
+        """
+        try:
+            return np.array([self.get_nanomaggies(x) for x in flux])
+        except TypeError:
+            return self.get_nanomaggies(flux)
 
 def make_ccdVisitId(visit, raft, sensor):
     """
@@ -22,6 +86,17 @@ def make_ccdVisitId(visit, raft, sensor):
     # combination to that and return as an int.
     ccdVisitId = int(raft[:3:2] + sensor[:3:2] + "%07i" % visit)
     return ccdVisitId
+
+def create_table(connection, table_name, dry_run=False, clobber=False):
+    """
+    Create the specified table using the corresponding script in the
+    sql subfolder.
+    """
+    if clobber and not dry_run:
+        connection.apply('drop table if exists %s' % table_name)
+    create_script = os.path.join(lsstUtils.getPackageDir('pserv'), 'sql',
+                                 'create_%s.sql' % table_name)
+    connection.run_script(create_script, dry_run=dry_run)
 
 def ingest_registry(connection, registry_file, project):
     """
@@ -99,7 +174,7 @@ def ingest_calexp_info(connection, repo, project):
     print('!')
 
 def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
-                             zeroPoint, project,
+                             flux_calibration, project,
                              psFlux='base_PsfFlux_flux',
                              psFlux_Sigma='base_PsfFlux_fluxSigma',
                              flags=0, fits_hdunum=1, csv_file='temp.csv',
@@ -113,14 +188,14 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
                                   ('ccdVisitId', ccdVisitId),
                                   ('psFlux', psFlux),
                                   ('psFlux_Sigma', psFlux_Sigma),
-                                  ('flags', flags)))
-    # Scale factors to convert from DN to nanomaggies.
-    scale_factors = dict(((psFlux, 1e9/zeroPoint),
-                          (psFlux_Sigma, 1e9/zeroPoint)))
+                                  ('flags', flags),
+                                  ('project', project)))
+    # Callbacks to apply calibration and convert to nanomaggies.
+    callbacks = dict(((psFlux, flux_calibration),
+                      (psFlux_Sigma, flux_calibration)))
     create_csv_file_from_fits(catalog_file, fits_hdunum, csv_file,
                               column_mapping=column_mapping,
-                              scale_factors=scale_factors,
-                              add_ons=dict(project=project))
+                              callbacks=callbacks)
     connection.load_csv('ForcedSource', csv_file)
     if cleanup:
         os.remove(csv_file)
@@ -132,20 +207,28 @@ def ingest_Object_data(connection, catalog_file, project):
     print("Ingesting %i objects" % nobjs)
     sys.stdout.flush()
     nrows = 0
-    for objectId, ra, dec, parent in zip(data['id'],
-                                         data['coord_ra'],
-                                         data['coord_dec'],
-                                         data['parent']):
+    for objectId, ra, dec, parent, extendedness \
+            in zip(data['id'],
+                   data['coord_ra'],
+                   data['coord_dec'],
+                   data['parent'],
+                   data['base_ClassificationExtendedness_value']):
         if nrows % int(nobjs/20) == 0:
             sys.stdout.write('.')
             sys.stdout.flush()
         ra_val = ra*180./np.pi
         dec_val = dec*180./np.pi
+        if np.isnan(extendedness):
+            extendedness = 1.
         query = """insert into Object
-                   (objectId, parentObjectId, psRa, psDecl, project)
-                   values (%i, %i, %17.9e, %17.9e, '%s')
-                   on duplicate key update psRa=%17.9e, psDecl=%17.9e""" \
-            % (objectId, parent, ra_val, dec_val, project, ra_val, dec_val)
+                   (objectId, parentObjectId, psRa, psDecl, extendedness,
+                   project)
+                   values (%i, %i, %17.9e, %17.9e, %17.9e, '%s')
+                   on duplicate key update psRa=%17.9e, psDecl=%17.9e,
+                   extendedness=%17.9e""" \
+            % (objectId, parent, ra_val, dec_val, extendedness, project,
+               ra_val, dec_val, extendedness)
         connection.apply(query)
         nrows += 1
     print("!")
+

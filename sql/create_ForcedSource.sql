@@ -1,4 +1,4 @@
-create table ForcedSource (
+create table if not exists ForcedSource (
        objectId BIGINT,
        ccdVisitId BIGINT,
        psFlux FLOAT,

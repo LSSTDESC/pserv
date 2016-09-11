@@ -1,4 +1,4 @@
-create table CcdVisit (
+create table if not exists CcdVisit (
        ccdVisitId BIGINT,
        visitId INTEGER,
        ccdName CHAR(3),
