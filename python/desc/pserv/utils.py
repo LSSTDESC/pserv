@@ -22,19 +22,21 @@ class FluxCalibrator(object):
     Functor class to convert uncalibrated fluxes from a given exposure
     to nanomaggies.
 
-    Parameters
-    ----------
-    zeroPoint : float
-        Zero point in ADU for the exposure in question.
-
     Attributes
     ----------
     zeroPoint : float
         Zero point in ADU for the exposure in question.
-
     """
     def __init__(self, zeroPoint):
-        "Class constructor"
+        """
+        Class constructor
+
+        Parameters
+        ----------
+        zeroPoint : float
+            Zero point in ADU for the exposure in question.
+        """
+
         self.zeroPoint = zeroPoint
 
     def get_nanomaggies(self, flux):
@@ -78,8 +80,23 @@ class FluxCalibrator(object):
 
 def make_ccdVisitId(visit, raft, sensor):
     """
-    Return an integer that uniquely identifies a visit-raft-sensor
-    combination.
+    Create the ccdVisitId to be used in the CcdVisit table.
+
+    Parameters
+    ----------
+    visit : int
+         visitId of the desired visit.
+    raft : str
+         Identifier of the raft location in the LSST focal plane,
+         e.g., 'R22'.
+    sensor : str
+         Identifier of the sensor location in a raft, e.g., 'S11'.
+
+    Returns
+    -------
+    int
+        An integer that uniquely identifies the visit-raft-sensor
+        combination.
     """
     # There are around 2.5 million visits in the 10 year survey, so 7
     # digits should suffice for the visit part.  Prepend the RRSS
@@ -91,6 +108,18 @@ def create_table(connection, table_name, dry_run=False, clobber=False):
     """
     Create the specified table using the corresponding script in the
     sql subfolder.
+
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to create the table.
+    table_name : str
+        The table name corresponding to the script in the sql subfolder.
+    dry_run : bool, optional
+        If True, just print the table creation code to the screen, but
+        don't execute.  The default value is False.
+    clobber : bool, optional
+        Overwrite the table if it already exists. Default: False
     """
     if clobber and not dry_run:
         connection.apply('drop table if exists %s' % table_name)
@@ -102,6 +131,13 @@ def ingest_registry(connection, registry_file, project):
     """
     Ingest some relevant data from a registry.sqlite3 file into
     the CcdVisit table.
+
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to modify the CcdVisit table.
+    registry_file : str
+        The sqlite registry file containing the visit information.
     """
     registry = sqlite3.connect(registry_file)
     query = """select taiObs, visit, filter, raft, ccd,
@@ -129,6 +165,18 @@ def ingest_calexp_info(connection, repo, project):
     Extract information such as zeroPoint, seeing, sky background, sky
     noise, etc., from the calexp products and insert the values into
     the CcdVisit table.
+
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to modify the CcdVisit table.
+    repo : str
+        The path the output data repository used by the Stack.
+    project : str
+        The name of the project for which the Level 2 analyses
+        run.  This is used to differentiate different projects in
+        the MySQL tables that may have colliding primary keys, e.g.,
+        various runs of Twinkles, or PhoSim Deep results.
     """
     # Use the Butler to find all of the visit/sensor combinations.
     butler = dp.Butler(repo)
@@ -148,7 +196,10 @@ def ingest_calexp_info(connection, repo, project):
                                      dataref.dataId['sensor'])
 
         # Compute zeroPoint, seeing, skyBg, skyNoise column values.
-        zeroPoint = calexp.getCalib().getFluxMag0()[0]
+        try:
+            zeroPoint = calexp.getCalib().getFluxMag0()[0]
+        except:
+            continue
         # For the psf_fwhm (=seeing) calculation, see
         # https://github.com/lsst/meas_deblender/blob/master/python/lsst/meas/deblender/deblend.py#L227
         pixel_scale = calexp.getWcs().pixelScale().asArcseconds()
@@ -183,6 +234,42 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
     Load the forced source catalog data into the ForcedSource table.
     Create a temporary csv file to take advantage of the efficient
     'LOAD DATA LOCAL INFILE' facility.
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to modify the CcdVisit table.
+    catalog_file : str
+        The path to the catalog file produced by the forcedPhotCcd.py
+        task.
+    ccdVisitId : int
+        Unique identifier of the visit-raft-sensor combination.
+    flux_calibration : function
+        A callback function to convert from ADU to nanomaggies. Usually,
+        this is a desc.pserv.FluxCalibrator object.
+    project : str
+        The name of the project for which the Level 2 analyses
+        run.  This is used to differentiate different projects in
+        the MySQL tables that may have colliding primary keys, e.g.,
+        various runs of Twinkles, or PhoSim Deep results.
+    psFlux : str, optional
+        The column name from the forced source catalog to use for the
+        point source flux in the ForcedSource table.
+        Default: 'base_PsfFlux_flux'
+    psFlux_Sigma : str, optional
+        The column name from the forced source catalog to use for the
+        uncertainty in the point source flux in the ForcedSource table.
+        Default: 'base_PsfFlux_fluxSigma'
+    flags : int, optional
+        Value to insert in the flag column in the ForcedSource table.
+        This is not really used.  Default: 0
+    fits_hdunum : int, optional
+        The HDU number of the binary table containing the forced source
+        data.
+    csv_file : str, optional
+        The file name to use for the csv file written to use with the
+        'LOAD DATA LOCAL INFILE' statement. Default: 'temp.csv'
+    cleanup : bool, optional
+        Flag to delete the csv_file after loading the data. Default: True
     """
     column_mapping = OrderedDict((('objectId', 'objectId'),
                                   ('ccdVisitId', ccdVisitId),
@@ -201,7 +288,22 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
         os.remove(csv_file)
 
 def ingest_Object_data(connection, catalog_file, project):
-    "Ingest the reference catalog from the merged coadds."
+    """
+    Ingest the reference catalog from the merged coadds.
+
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to modify the Object table.
+    catalog_file : str
+        The path to the file of the merged coadd catalog file produced
+        by Level 2 analysis.
+    project : str
+        The name of the project for which the Level 2 analyses
+        run.  This is used to differentiate different projects in
+        the MySQL tables that may have colliding primary keys, e.g.,
+        various runs of Twinkles, or PhoSim Deep results.
+    """
     data = fits.open(catalog_file)[1].data
     nobjs = len(data['id'])
     print("Ingesting %i objects" % nobjs)
@@ -231,4 +333,3 @@ def ingest_Object_data(connection, catalog_file, project):
         connection.apply(query)
         nrows += 1
     print("!")
-

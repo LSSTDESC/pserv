@@ -26,6 +26,13 @@ class DbConnection(object):
     def __init__(self, **kwds):
         """
         Constructor to make the connection object.
+
+        Parameters
+        ----------
+        **kwds : **dict
+            keyword arguments with the database info.  Minimally,
+            this would include host and port, but can also include
+            the database name.
         """
         if not kwds.has_key('query'): # enable LOAD LOCAL INFILE
             kwds['query'] = dict()
@@ -40,6 +47,11 @@ class DbConnection(object):
     def _get_mysql_connection(self, kwds_par):
         """
         Set the self._mysql_connection attribute
+
+        Parameters
+        ----------
+        kwds_par : dict
+            Dictionary of connection info to pass to sqlalchemy.
         """
         kwds = copy.deepcopy(kwds_par)
         try:
@@ -58,13 +70,24 @@ class DbConnection(object):
         engine = sqlalchemy.create_engine(db_url)
         self._mysql_connection = engine.raw_connection()
 
-    def apply(self, query, cursorFunc=_nullFunc):
+    def apply(self, sql, cursorFunc=_nullFunc):
         """
-        Apply the query, optionally using the cursorFunc to process
-        the query results.
+        Apply an SQL statement, optionally using the cursorFunc to
+        process any query results.
+
+        Parameters
+        ----------
+        sql : str
+            An SQL statement.
+
+        cursorFunc : callback function, optional
+            Functor used to process the output of an SQL statement
+            For non-queries, a do-nothing null object is passed by
+            default.
+
         """
         cursor = self._mysql_connection.cursor()
-        cursor.execute(query)
+        cursor.execute(sql)
         results = cursorFunc(cursor)
         cursor.close()
         if cursorFunc is _nullFunc:
@@ -72,18 +95,40 @@ class DbConnection(object):
         return results
 
     def run_script(self, script, dry_run=False):
-        "Execute a script of sql."
+        """Execute a script of SQL code.
+
+        Parameters
+        ----------
+        script : str
+            Name of the file containing the code.
+
+        dry_run : bool, optional
+            If True, just print the SQL code to the screen, but don't
+            execute.  The default value is False.
+        """
         with open(script) as script_data:
-            query = ''.join(script_data.readlines())
+            sql = ''.join(script_data.readlines())
         if dry_run:
-            print(query)
+            print(sql)
         else:
-            self.apply(query)
+            self.apply(sql)
 
     def load_csv(self, table_name, csv_file):
         """
-        Load a csv file into the specified table.  Non-char data has
-        to be type converted explicitly using a cast for those columns.
+        Load a csv file into the specified table.
+
+        Parameters
+        ----------
+        table_name : str
+            The name of the db table to load into.
+
+        csv_file : str
+            The name of the csv file containing the data.
+
+        Notes
+        -----
+        Non-char data has to be type converted explicitly using a cast
+        for those columns.
         """
         # Get the column names and data types.
         query = """SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
@@ -94,13 +139,13 @@ class DbConnection(object):
                 dtypes[x] = 1
             return tuple(dtypes.keys())
         data_types = self.apply(query, cursorFunc=dtype_tuple)
-        query = """LOAD DATA LOCAL INFILE '%(csv_file)s'
-                   INTO TABLE %(table_name)s
-                   FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n'
-                   IGNORE 1 LINES (""" % locals()
+        sql = """LOAD DATA LOCAL INFILE '%(csv_file)s'
+                 INTO TABLE %(table_name)s
+                 FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n'
+                 IGNORE 1 LINES (""" % locals()
         column_names = tuple(x[0] for x in data_types)
         self.check_column_names(column_names, csv_file)
-        query += ',\n'.join(column_names) + ')'
+        sql += ',\n'.join(column_names) + ')'
         # Check for conversions from non-char(n) data types.
         conversions = [dt_pair for dt_pair in data_types
                        if dt_pair[1].find('char') == -1]
@@ -110,19 +155,34 @@ class DbConnection(object):
                        ('float', 'DECIMAL(50,25)'),
                        ('double', 'DECIMAL(65,30)')))
         if conversions:
-            query += ' set \n'
+            sql += ' set \n'
             cast_list = []
             for column_name, data_type in conversions:
                 my_dtype = dtypes[data_type]
                 cast_list.append(
                     '%(column_name)s=cast(%(column_name)s as %(my_dtype)s)'
                     % locals())
-            query += ',\n'.join(cast_list) + ';'
-        self.apply(query)
+            sql += ',\n'.join(cast_list) + ';'
+        self.apply(sql)
 
     @staticmethod
     def check_column_names(column_names, csv_file):
-        "Check the column names against those in the csv file."
+        """
+        Check the column names against those in the csv file.
+
+        Parameters
+        ----------
+        column_names : sequence
+            The column names expected to be in the csv file
+        csv_file : str
+            The name of the csv file containing the data.
+
+        Raises
+        ------
+        RuntimeError
+            If there is any mismatch between the expected columns and
+            the ones in the csv file.
+        """
         with open(csv_file, 'r') as csv_input:
             csv_cols = csv_input.readline().strip().split(',')
         if len(csv_cols) != len(column_names):
@@ -136,7 +196,28 @@ class DbConnection(object):
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                               column_mapping=None, callbacks=None):
-    "Create a csv file from a FITS binary table."
+    """
+    Create a csv file from a FITS binary table.
+
+    Parameters
+    ----------
+    fits_file : str
+         Name of the FITS file.
+    fits_hdunum : int
+         HDU number of the binary table to process.
+    csv_file : str
+         Name of the csv file to create.
+    column_mapping : dict, optional
+         Mapping between column names in the FITS file and the column
+         names to be used in the csv file.  The latter should match
+         the columns in the db table to be filled.  By default, the
+         FITS table column names are used.
+    callbacks : dict, optional
+         A dictionary of optional callback functions to apply to a
+         column, keyed by FITS table column name.  This is used to
+         apply any simple transformations to the column, e.g., scaling
+         by flux zeropoint or units conversion.
+    """
     bintable = fits.open(fits_file)[fits_hdunum]
     if column_mapping is None:
         column_mapping = OrderedDict([(coldef.name, coldef.name)
