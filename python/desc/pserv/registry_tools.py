@@ -10,6 +10,22 @@ import astropy.time
 __all__ = ['find_registry', 'get_visit_mjds', 'get_visits']
 
 def find_registry(data_repo, registry_name='registry.sqlite3'):
+    """
+    Find the registry file associated with a data repository processed
+    by the LSST Stack.
+
+    Parameters
+    ----------
+    data_repo : str
+        Path to the repository.
+    registry_name : str
+        Name of the registry file.  Default: 'registry.sqlite3'
+
+    Returns
+    -------
+    str
+        The path to the registry file.
+    """
     basePath = data_repo
     while not os.path.exists(os.path.join(basePath, registry_name)):
         if os.path.exists(os.path.join(basePath, "_parent")):
@@ -23,6 +39,16 @@ def get_visit_mjds(data_repo):
     Return a dictionary of visit MJDs keyed by visit number.
     data_repo is the output repository of the Twinkles Level 2
     pipeline.
+
+    Parameters
+    ----------
+    data_repo : str
+        Path to the repository.
+
+    Returns
+    -------
+    OrderedDict
+        The MJDs keyed by visit number.
     """
     registry_file = find_registry(data_repo)
     conn = sqlite3.connect(registry_file)
@@ -38,6 +64,17 @@ def get_visits(data_repo):
     Return a dictionary of visits ids keyed by 'ugrizy' filter.
     data_repo is the output repository of the Twinkles Level 2
     pipeline.
+
+    Parameters
+    ----------
+    data_repo : str
+        Path to the repository.
+
+    Returns
+    -------
+    OrderedDict
+        Lists of visit ids (obsHistID from the opsim db file, or
+        visitId from the Level 2 Visit table) keyed by filter.
     """
     registry_file = find_registry(data_repo)
     conn = sqlite3.connect(registry_file)

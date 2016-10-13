@@ -17,14 +17,6 @@ class RepositoryInfo(object):
     Class for extracting information about an LSST Stack output
     respository.
 
-    Parameters
-    ----------
-    repo : str
-        Path (relative or absolute) to the output respository created
-        by the Stack.
-    registry_name : str, optional
-        Filename of the sqlite registry file.
-
     Attributes
     ----------
     repo : str
@@ -34,7 +26,17 @@ class RepositoryInfo(object):
 
     """
     def __init__(self, repo, registry_name='registry.sqlite3'):
-        "Class constructor"
+        """
+        Class constructor
+
+        Parameters
+        ----------
+        repo : str
+            Path (relative or absolute) to the output respository created
+            by the Stack.
+        registry_name : str, optional
+            Filename of the sqlite registry file.
+        """
         self.repo = repo
         self.registry_file = self.find_registry(repo, registry_name)
 
