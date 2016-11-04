@@ -78,10 +78,10 @@ added to the Level 2 [baseline table
 schemas](https://lsst-web.ncsa.illinois.edu/schema/index.php?sVer=baseline)
 and made part of the primary key for each.)  The default values of the
 `database`, `host`, and `port` options have been set for the
-`DESC_Twinkles_Level_2` tables.  __Do not use the `--clobber` option__
-as this will drop and recreate tables from scratch before the loading
-the data.  The ``--dry_run` option can be used to show what will be
-run without executing anything.
+`DESC_Twinkles_Level_2` tables at NERSC.  __Do not use the `--clobber`
+option__ as this will drop and recreate tables from scratch before the
+loading the data.  The ``--dry_run` option can be used to show what
+will be run without executing anything.
 
 Note that for Twinkles Run1.1, we only used the `CcdVisit`, `Object`,
 and `ForcedSource` tables and the columns of those tables that were
