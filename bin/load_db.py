@@ -7,19 +7,14 @@ import os
 import sys
 from warnings import filterwarnings
 from collections import OrderedDict
-import numpy as np
+import lsst.log as lsst_log
 import desc.pserv
 import desc.pserv.utils as pserv_utils
 
+lsst_log.setLevel(lsst_log.getDefaultLoggerName(), lsst_log.INFO)
+
 # Suppress warnings from database module.
 filterwarnings('ignore')
-
-def create_tables(connection, tables=('CcdVisit', 'Object', 'ForcedSource'),
-                  dry_run=False, clobber=False):
-    "Create the CcdVisit, Object, and ForcedSource tables."
-    for table_name in tables:
-        pserv_utils.create_table(connection, table_name, dry_run=dry_run,
-                                 clobber=clobber)
 
 def ingest_forced_catalogs(connection, repo_info, project, tract=0,
                            dry_run=False):
@@ -74,8 +69,6 @@ Source tables with Level 2 pipeline output."""
                         help='Host server for the MySQL database')
     parser.add_argument('--port', type=str, default='3306',
                         help='Port used by the database host')
-    parser.add_argument('--clobber', default=False, action='store_true',
-                        help='Drop existing tables and recreate')
     parser.add_argument('--dry_run', default=False, action='store_true',
                         help='Do not execute queries')
     args = parser.parse_args()
@@ -85,8 +78,6 @@ Source tables with Level 2 pipeline output."""
     connect = desc.pserv.DbConnection(database=args.database,
                                       host=args.host,
                                       port=args.port)
-
-    create_tables(connect, dry_run=args.dry_run, clobber=args.clobber)
 
     if args.dry_run:
         print("Ingest registry file", repo_info.registry_file)
