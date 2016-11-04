@@ -32,4 +32,5 @@ script:
   - pylint --py3k `find . -name \*.py -print`
 
 after_success:
+  - pylint -r n --rcfile=.pylintrc `find . -name \*.py -print`
   - coveralls

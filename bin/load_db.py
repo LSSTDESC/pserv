@@ -7,7 +7,6 @@ import os
 import sys
 from warnings import filterwarnings
 from collections import OrderedDict
-import numpy as np
 import lsst.log as lsst_log
 import desc.pserv
 import desc.pserv.utils as pserv_utils
