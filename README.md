@@ -1,7 +1,7 @@
 # Pserv: megascale undistributed database
 
-[![Build Status](https://travis-ci.org/DarkEnergyScienceCollaboration/pserv.svg?branch=master)](https://travis-ci.org/DarkEnergyScienceCollaboration/pserv)
-[![Coverage Status](https://coveralls.io/repos/github/DarkEnergyScienceCollaboration/pserv/badge.svg?branch=master)](https://coveralls.io/github/DarkEnergyScienceCollaboration/pserv?branch=master)
+[![Build Status](https://travis-ci.org/LSSTDESC/pserv.svg?branch=master)](https://travis-ci.org/LSSTDESC/pserv)
+[![Coverage Status](https://coveralls.io/repos/github/LSSTDESC/pserv/badge.svg?branch=master)](https://coveralls.io/github/LSSTDESC/pserv?branch=master)
 
 This is a package of scripts to set up, maintain, and provide interfaces to a
 very simple "preliminary" or "practice" database which serves LSST data resulting from
