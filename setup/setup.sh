@@ -8,5 +8,5 @@
 # PATH, etc..
 
 inst_dir=$( cd $(dirname $BASH_SOURCE)/..; pwd -P )
-eups declare Pserv -r ${inst_dir} -t ${USER}
-setup Pserv -t ${USER}
+eups declare pserv -r ${inst_dir} -t ${USER}
+setup pserv -t ${USER}
