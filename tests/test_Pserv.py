@@ -321,6 +321,7 @@ class PservTestCase(unittest.TestCase):
         self.assertIn('FLAGS2 BIGINT,', lines)
         self.assertIn('primary key (id, project)', lines)
         self.assertIn('project INT,', lines)
+        os.remove(catalog_file)
 
 if __name__ == '__main__':
     unittest.main()
