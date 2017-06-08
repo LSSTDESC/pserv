@@ -319,9 +319,10 @@ class PservTestCase(unittest.TestCase):
         self.assertIn('base_SdssShape_xxSigma FLOAT,' , lines)
         self.assertIn('FLAGS1 BIGINT,', lines)
         self.assertIn('FLAGS2 BIGINT,', lines)
+        self.assertIn('FLAGS3 BIGINT,', lines)
         self.assertIn('primary key (id, project)', lines)
         self.assertIn('project INT,', lines)
-        os.remove(catalog_file)
+        os.remove(sql_file)
 
 if __name__ == '__main__':
     unittest.main()
