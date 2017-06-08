@@ -149,6 +149,26 @@ class PservTestCase(unittest.TestCase):
             os.remove(self.fits_file)
         hdulist.writeto(self.fits_file)
 
+    @staticmethod
+    def _create_fits_bintable_with_flags(fits_file):
+        "Create a FITS binary table with flags."
+        hdulist = fits.HDUList()
+        hdulist.append(fits.PrimaryHDU())
+        colnames = ['flags', 'id']
+        formats = ['100X', 'K']
+        data = [(np.array([True] + 99*[False]),
+                 np.array(63*[False] + [True] + 36*[False]),
+                 np.array(64*[False] + [True] + 35*[False])),
+                (0, 1, 2)]
+        columns = [fits.Column(name=colnames[i], format=formats[i],
+                               array=data[i]) for i in range(len(colnames))]
+        bintable = fits.BinTableHDU.from_columns(columns)
+        bintable.name = 'TEST_DATA'
+        hdulist.append(bintable)
+        if os.path.isfile(fits_file):
+            os.remove(fits_file)
+        hdulist.writeto(fits_file, clobber=True)
+
     def _create_csv_file(self, csv_file='test_file.csv',
                          column_mapping=None, fits_hdnum=1):
         """
@@ -323,6 +343,36 @@ class PservTestCase(unittest.TestCase):
         self.assertIn('primary key (id, project)', lines)
         self.assertIn('project INT,', lines)
         os.remove(sql_file)
+
+    def test_pack_flags(self):
+        "Test function to pack an array of bools into unsigned ints."
+        nflags = 142
+        nbits = 64
+        data = [np.array([True] + (nflags-1)*[False]),
+                np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False]),
+                np.array(2*nbits*[False] + [True] + (nflags-2*nbits-1)*[False]),
+                np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
+                np.array((2*nbits-1)*[False] + [True] + (nflags-2*nbits)*[False]),
+                np.array((nflags-1)*[False] + [True])]
+        expected = [(1, 0, 0), (0, 1, 0), (0, 0, 1),
+                    (2**(nbits-1), 0, 0), (0, 2**(nbits-1), 0),
+                    (0, 0, 2**(nflags-2*nbits-1))]
+        for flags, values in zip(data, expected):
+            packed = desc.pserv.pack_flags(flags, nbits=nbits)
+            for bigint, value in zip(packed, values):
+                self.assertEqual(bigint, value)
+
+    def test_create_csv_file_from_fits_with_flag(self):
+        "Test create_csv_file_from_fits for a file with flags."
+        fits_file = 'test_bin_table_flags.fits'
+        hdunum = 1
+        csv_file = 'test_bin_table_flags.csv'
+        self._create_fits_bintable_with_flags(fits_file)
+        desc.pserv.create_csv_file_from_fits(fits_file, hdunum, csv_file)
+        with open(csv_file) as csv_data:
+            self.assertEqual('FLAGS1,FLAGS2,id\n', csv_data.readline())
+            for line in csv_data:
+                self.assertEqual('1,0,0\n', line)
 
 if __name__ == '__main__':
     unittest.main()

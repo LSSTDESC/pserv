@@ -12,7 +12,7 @@ import sqlalchemy
 import lsst.daf.persistence as dp
 
 __all__ = ['DbConnection', 'create_csv_file_from_fits',
-           'create_schema_from_fits']
+           'create_schema_from_fits', 'pack_flags']
 
 def _nullFunc(*args):
     """
@@ -220,19 +220,27 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
          apply any simple transformations to the column, e.g., scaling
          by flux zeropoint or units conversion.
     """
-    bintable = fits.open(fits_file)[fits_hdunum]
-    if column_mapping is None:
-        column_mapping = OrderedDict([(coldef.name, coldef.name)
-                                      for coldef in bintable.columns])
     if callbacks is None:
         callbacks = {}
+    nbits = 64
+    bintable = fits.open(fits_file)[fits_hdunum]
+    if column_mapping is None:
+        column_mapping = OrderedDict()
+        for coldef in bintable.columns:
+            if coldef.format[-1] == 'X':
+                num_fields = int(np.ceil(float(coldef.format[:-1])/nbits))
+                for ifield in range(num_fields):
+                    name = '%s%i' % (coldef.name.upper(), ifield + 1)
+                    column_mapping[name] = name
+            else:
+                column_mapping[coldef.name] = coldef.name
     with open(csv_file, 'w') as csv_output:
         writer = csv.writer(csv_output, delimiter=',', lineterminator='\n')
         colnames = list(column_mapping.keys())
         writer.writerow(colnames)
         nrows = bintable.header['NAXIS2']
         columns = []
-        bintable_colnames = [x.name for x in bintable.columns.columns]
+        bintable_colnames = [x.name for x in bintable.columns]
         for colname in column_mapping.values():
             if colname in bintable_colnames:
                 coldata = bintable.data[colname]
@@ -248,6 +256,25 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
 
 def create_schema_from_fits(fits_file, hdunum, outfile, table_name,
                             primary_key='', add_columns=()):
+    """
+    Create an SQL schema from a FITS binary table.
+
+    Parameters
+    ----------
+    fits_file : str
+        The filename of the FITS file with the binary table.
+    hdunum : int
+        The HDU number of the binary table.
+    outfile : str
+        The filename of the output file to contain the SQL schema.
+    table_name : str
+        The name of the table to create.
+    primary_key : str, optional
+        The primary key to use.  Default: ''.
+    add_columns : tuple, optional
+        Columns to add to the schema that are not in the FITS table, e.g.,
+        add_columns=('project INT',).  Default: ().
+    """
     padding = 7*' '
     bin_table = fits.open(fits_file)[hdunum]
     with open(outfile, 'w') as output:
@@ -260,6 +287,18 @@ def create_schema_from_fits(fits_file, hdunum, outfile, table_name,
                      '%s)\n' % padding)
 
 def write_schema_column(output, column, padding):
+    """
+    Write a schema column given a column description from astropy.io.fits.
+
+    Parameters
+    ----------
+    output : file
+        The file object to write the schema column entry.
+    column : astropy.io.fits.column.Column
+        The table column for which to write the SQL schema column.
+    padding : str
+        The padding string to prepend to the SQL schema column line.
+    """
     type_map = {'1D' : 'DOUBLE',
                 '1E' : 'FLOAT',
                 '1K' : 'BIGINT',
@@ -275,6 +314,24 @@ def write_schema_column(output, column, padding):
     output.write('%s%s %s,\n' % (padding, column.name, type_map[format]))
 
 def write_bit_schema_column(output, column, padding):
+    """
+    Write schema columns as BIGINT types to contain FITS bit columns
+    of format 'NNNX', e.g, a FITS column with format '142X' will produce
+    3 (= ceil(142./64)) SQL table columns.  Following the Qserv baseline
+    schema convention for the "FLAGS" columns, the column.name will be
+    converted to upper case and the column number (starting with '1')
+    will be appended, e.g., name='flags', format='142X' will produce
+    'FLAGS1 BIGINT,', 'FLAGS2 BIGINT,', 'FLAGS3 BIGINT,' SQL lines.
+
+    Parameters
+    ----------
+    output : file
+        The file object to write the schema column entry.
+    column : astropy.io.fits.column.Column
+        The table column for which to write the SQL schema column.
+    padding : str
+        The padding string to prepend to the SQL schema column line.
+    """
     mysql_type = 'BIGINT'
     colsize = 64
     format = column.format.strip("'")
@@ -283,3 +340,24 @@ def write_bit_schema_column(output, column, padding):
     for icol in range(ncols):
         name = '%s%i' % (column.name.upper(), icol + 1)
         output.write('%s%s %s,\n' % (padding, name, mysql_type))
+
+def pack_flags(flags, nbits=64):
+    """
+    Pack an array of boolean flags into integers with nbits bits.
+
+    Parameters
+    ----------
+    flags : np.array
+        numpy array of bools.
+    nbits : int, optional
+        Number of bits per integer.  Default: 64.
+
+    Returns
+    -------
+    list : A list of integers with the packed flags.
+    """
+    num_ints = int(np.ceil(float(len(flags))/nbits))
+    subarrs = [flags[i*nbits:(i+1)*nbits] for i in range(num_ints)]
+    values = [sum([long(2**i) for i, flag in enumerate(subarr) if flag])
+              for subarr in subarrs]
+    return values
