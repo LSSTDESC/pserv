@@ -303,7 +303,7 @@ class PservTestCase(unittest.TestCase):
     def test_create_schema_from_fits(self):
         "Test the creation of a schema from a FITS binary table."
         catalog_file = os.path.join(os.environ['PSERV_DIR'], 'tests',
-                                    'ref-0-10,11_truncated.fits')
+                                    'ref-0-10,11_truncated.fits.gz')
         sql_file = 'bintable_schema.sql'
         fits_hdunum = 1
         table_name = 'deepCoadd_catalog'
