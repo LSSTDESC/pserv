@@ -300,5 +300,27 @@ class PservTestCase(unittest.TestCase):
                           *(self.test_table, csv_file))
         os.remove(csv_file)
 
+    def test_create_schema_from_fits(self):
+        "Test the creation of a schema from a FITS binary table."
+        catalog_file = os.path.join(os.environ['PSERV_DIR'], 'tests',
+                                    'ref-0-10,11_truncated.fits')
+        sql_file = 'bintable_schema.sql'
+        fits_hdunum = 1
+        table_name = 'deepCoadd_catalog'
+        desc.pserv.create_schema_from_fits(catalog_file, fits_hdunum, sql_file,
+                                           table_name,
+                                           primary_key='id, project',
+                                           add_columns=('project INT',))
+        with open(sql_file) as schema:
+            lines = [x.strip() for x in schema.readlines()]
+        self.assertIn('id BIGINT,', lines)
+        self.assertIn('coord_ra DOUBLE,' , lines)
+        self.assertIn('deblend_nChild INT,' , lines)
+        self.assertIn('base_SdssShape_xxSigma FLOAT,' , lines)
+        self.assertIn('FLAGS1 BIGINT,', lines)
+        self.assertIn('FLAGS2 BIGINT,', lines)
+        self.assertIn('primary key (id, project)', lines)
+        self.assertIn('project INT,', lines)
+
 if __name__ == '__main__':
     unittest.main()

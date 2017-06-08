@@ -6,11 +6,13 @@ import copy
 import csv
 import json
 from collections import OrderedDict
+import numpy as np
 import astropy.io.fits as fits
 import sqlalchemy
 import lsst.daf.persistence as dp
 
-__all__ = ['DbConnection', 'create_csv_file_from_fits']
+__all__ = ['DbConnection', 'create_csv_file_from_fits',
+           'create_schema_from_fits']
 
 def _nullFunc(*args):
     """
@@ -243,3 +245,41 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                 columns.append([colname]*nrows)
         for row in zip(*tuple(columns)):
             writer.writerow(row)
+
+def create_schema_from_fits(fits_file, hdunum, outfile, table_name,
+                            primary_key='', add_columns=()):
+    padding = 7*' '
+    bin_table = fits.open(fits_file)[hdunum]
+    with open(outfile, 'w') as output:
+        output.write('create table if not exists %s (\n' % table_name)
+        for column in bin_table.columns:
+            write_schema_column(output, column, padding)
+        for column in add_columns:
+            output.write('%s%s,\n' % (padding, column))
+        output.write('%sprimary key (%s)\n' % (padding, primary_key) +
+                     '%s)\n' % padding)
+
+def write_schema_column(output, column, padding):
+    type_map = {'1D' : 'DOUBLE',
+                '1E' : 'FLOAT',
+                '1K' : 'BIGINT',
+                '1J' : 'INT',
+                '1I' : 'SMALLINT'}
+    format = column.format.strip("'")
+    if format[-1] == 'X':
+        write_bit_schema_column(output, column, padding)
+        return
+    if int(format[:-1]) != 1:
+        # Skip vector columns.
+        return
+    output.write('%s%s %s,\n' % (padding, column.name, type_map[format]))
+
+def write_bit_schema_column(output, column, padding):
+    mysql_type = 'BIGINT'
+    colsize = 64
+    format = column.format.strip("'")
+    num_bits = float(format[:-1])
+    ncols = int(np.ceil(num_bits/colsize))
+    for icol in range(ncols):
+        name = '%s%i' % (column.name.upper(), icol + 1)
+        output.write('%s%s %s,\n' % (padding, name, mysql_type))
