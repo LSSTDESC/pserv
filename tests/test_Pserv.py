@@ -378,6 +378,26 @@ class PservTestCase(unittest.TestCase):
         os.remove(fits_file)
         os.remove(csv_file)
 
+    def test_get_pandas_data_frame(self):
+        """
+        Test get_pandas_data_frame which retrieves a df with the table
+        data given a select query.
+        """
+        self._fill_test_table()
+        # Test getting all of the columns
+        query = "select * from %s" % self.test_table
+        df = self.connection.get_pandas_data_frame(query)
+        self.assertEqual(df.shape, (4, 5))
+        self.assertEqual(df['keywd'].values[0], 'a')
+        self.assertAlmostEqual(df['double_value'].values[2], np.pi, places=5)
+
+        # Test getting a selection of columns.
+        query = "select keywd, double_value from %s" % self.test_table
+        df = self.connection.get_pandas_data_frame(query)
+        self.assertEqual(df.shape, (4, 2))
+        self.assertEqual(df['keywd'].values[0], 'a')
+        self.assertAlmostEqual(df['double_value'].values[2], np.pi, places=5)
+
 class BinTableDataTestCase(unittest.TestCase):
     "TestCase class for BinTableData class."
     def setUp(self):

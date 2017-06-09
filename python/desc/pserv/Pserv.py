@@ -6,6 +6,7 @@ import copy
 import csv
 from collections import OrderedDict
 import numpy as np
+import pandas as pd
 import astropy.io.fits as fits
 import sqlalchemy
 import lsst.daf.persistence as dp
@@ -194,6 +195,22 @@ class DbConnection(object):
                 message = 'Column name mismatch between csv file and db table:'
                 message += ' %s vs %s' % (csv_col, table_col)
                 raise RuntimeError(message)
+
+    def get_pandas_data_frame(self, query):
+        """
+        Retrieve a pandas DataFrame via the specified query.
+
+        Parameters
+        ----------
+        query : str
+            A select query of the form
+            'select [<colunms>,*] from <table_name> where <condition>'
+
+        Returns
+        -------
+        pandas.DataFrame : A data frame containing the selected table data.
+        """
+        return pd.read_sql(query, con=self._mysql_connection)
 
 class BinTableData(OrderedDict):
     """
