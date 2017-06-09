@@ -154,11 +154,13 @@ class PservTestCase(unittest.TestCase):
         "Create a FITS binary table with flags."
         hdulist = fits.HDUList()
         hdulist.append(fits.PrimaryHDU())
+        nbits = 63
+        nflags = 100
         colnames = ['flags', 'id']
-        formats = ['100X', 'K']
-        data = [(np.array([True] + 99*[False]),
-                 np.array(63*[False] + [True] + 36*[False]),
-                 np.array(64*[False] + [True] + 35*[False])),
+        formats = ['%sX' % nflags, 'K']
+        data = [(np.array([True] + (nflags-1)*[False]),
+                 np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
+                 np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False])),
                 (0, 1, 2)]
         columns = [fits.Column(name=colnames[i], format=formats[i],
                                array=data[i]) for i in range(len(colnames))]
@@ -277,6 +279,23 @@ class PservTestCase(unittest.TestCase):
             self.assertEqual(fp1, fp2)
         os.remove(csv_file)
 
+    def test_create_csv_file_from_fits_with_added_columns(self):
+        "Test create_csv_file_from_fits with added columns."
+        fits_file = os.path.join(os.environ['PSERV_DIR'], 'tests',
+                                 'ref-0-10,11_truncated.fits.gz')
+        hdunum = 1
+        csv_file = 'test_added_columns.csv'
+        projectId = 1
+        desc.pserv.create_csv_file_from_fits(fits_file, hdunum, csv_file,
+                                             added_columns=dict(projectId=projectId))
+        with open(csv_file) as csv_data:
+            reader = csv.reader(csv_data, delimiter=',')
+            row = reader.next()
+            self.assertEqual(row[-1], 'projectId')
+            for row in reader:
+                self.assertEqual(row[-1], '%s' % projectId)
+        os.remove(csv_file)
+
     def test_load_csv(self):
         """
         Test that after loading the csv file generated from FITS data,
@@ -337,9 +356,9 @@ class PservTestCase(unittest.TestCase):
         self.assertIn('coord_ra DOUBLE,', lines)
         self.assertIn('deblend_nChild INT,', lines)
         self.assertIn('base_SdssShape_xxSigma FLOAT,', lines)
-        self.assertIn('FLAGS1 BIGINT,', lines)
-        self.assertIn('FLAGS2 BIGINT,', lines)
-        self.assertIn('FLAGS3 BIGINT,', lines)
+        self.assertIn('FLAGS1 BIGINT UNSIGNED,', lines)
+        self.assertIn('FLAGS2 BIGINT UNSIGNED,', lines)
+        self.assertIn('FLAGS3 BIGINT UNSIGNED,', lines)
         self.assertIn('primary key (id, project)', lines)
         self.assertIn('project INT,', lines)
         os.remove(sql_file)
@@ -354,7 +373,7 @@ class PservTestCase(unittest.TestCase):
         with open(csv_file) as csv_data:
             self.assertEqual('FLAGS1,FLAGS2,id\n', csv_data.readline())
             self.assertEqual('1,0,0\n', csv_data.readline())
-            self.assertEqual('%d,0,1\n' % 2**63, csv_data.readline())
+            self.assertEqual('%d,0,1\n' % 2**62, csv_data.readline())
             self.assertEqual('0,1,2\n', csv_data.readline())
         os.remove(fits_file)
         os.remove(csv_file)

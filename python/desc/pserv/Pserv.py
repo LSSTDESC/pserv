@@ -202,14 +202,14 @@ class BinTableData(OrderedDict):
     into bit-packed long integer columns.  Otherwise it just serves
     up the column arrays from the binary table.
     """
-    def __init__(self, bintable, nbits=64):
+    def __init__(self, bintable, nbits=63):
         """
         Parameters
         ----------
         bintable : astropy.io.fits.hdu.table.BinTableHDU
             Binary table to manage.
         nbits : int, optional
-            Number of bits per integer.  Default: 64.
+            Number of bits per integer.  Default: 63.
         """
         super(BinTableData, self).__init__()
         for col in bintable.columns:
@@ -221,9 +221,10 @@ class BinTableData(OrderedDict):
                     self[name] = np.array(flags, dtype=np.uint64)
             else:
                 self[col.name] = bintable.data[col.name]
+        self.nrows = len(self.values()[0])
 
     @staticmethod
-    def pack_flags(flags, nbits=64):
+    def pack_flags(flags, nbits=63):
         """
         Pack an array of boolean flags into integers with nbits bits.
 
@@ -232,7 +233,7 @@ class BinTableData(OrderedDict):
         flags : np.array
             numpy array of bools.
         nbits : int, optional
-            Number of bits per integer.  Default: 64.
+            Number of bits per integer.  Default: 63.
 
         Returns
         -------
@@ -246,7 +247,8 @@ class BinTableData(OrderedDict):
 
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
-                              column_mapping=None, callbacks=None):
+                              column_mapping=None, callbacks=None,
+                              added_columns=None):
     """
     Create a csv file from a FITS binary table.
 
@@ -268,18 +270,25 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
          column, keyed by FITS table column name.  This is used to
          apply any simple transformations to the column, e.g., scaling
          by flux zeropoint or units conversion.
+    added_columns : dict, optional
+         A dictionary, keyed by column name, of columns to add with the
+         value to be set.  If None (default), no extra columns will be
+         added.
     """
     if callbacks is None:
         callbacks = {}
-    bintable = fits.open(fits_file)[fits_hdunum]
-    bintable_data = BinTableData(bintable)
+    bintable_data = BinTableData(fits.open(fits_file)[fits_hdunum])
+    if added_columns is not None:
+        for name, value in added_columns.items():
+            if bintable_data.has_key(name):
+                raise RuntimeError("Column named %s already exists in the binary table data." % name)
+            bintable_data[name] = np.array([value]*bintable_data.nrows)
     if column_mapping is None:
         column_mapping = OrderedDict([(name, name) for name in bintable_data])
     with open(csv_file, 'w') as csv_output:
         writer = csv.writer(csv_output, delimiter=',', lineterminator='\n')
         colnames = list(column_mapping.keys())
         writer.writerow(colnames)
-        nrows = bintable.header['NAXIS2']
         columns = []
         for colname in column_mapping.values():
             if colname in bintable_data.keys():
@@ -290,8 +299,10 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                     pass
                 columns.append(coldata.tolist())
             else: # Assume colname is a numeric or string constant.
-                columns.append([colname]*nrows)
+                columns.append([colname]*bintable_data.nrows)
         for row in zip(*tuple(columns)):
+            row = [x if isinstance(x, str) or np.isfinite(x)
+                   else '\N' for x in row]
             writer.writerow(row)
 
 def create_schema_from_fits(fits_file, hdunum, outfile, table_name,
@@ -357,7 +368,7 @@ def write_bit_schema_column(output, column, padding):
     """
     Write schema columns as BIGINT types to contain FITS bit columns
     of format 'NNNX', e.g, a FITS column with format '142X' will produce
-    3 (= ceil(142./64)) SQL table columns.  Following the Qserv baseline
+    3 (= ceil(142./63)) SQL table columns.  Following the Qserv baseline
     schema convention for the "FLAGS" columns, the column.name will be
     converted to upper case and the column number (starting with '1')
     will be appended, e.g., name='flags', format='142X' will produce
@@ -372,8 +383,8 @@ def write_bit_schema_column(output, column, padding):
     padding : str
         The padding string to prepend to the SQL schema column line.
     """
-    mysql_type = 'BIGINT'
-    colsize = 64
+    mysql_type = 'BIGINT UNSIGNED'
+    colsize = 63
     format_ = column.format.strip("'")
     num_bits = float(format_[:-1])
     ncols = int(np.ceil(num_bits/colsize))
