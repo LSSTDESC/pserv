@@ -371,8 +371,11 @@ class PservTestCase(unittest.TestCase):
         desc.pserv.create_csv_file_from_fits(fits_file, hdunum, csv_file)
         with open(csv_file) as csv_data:
             self.assertEqual('FLAGS1,FLAGS2,id\n', csv_data.readline())
-            for line in csv_data:
-                self.assertEqual('1,0,0\n', line)
+            self.assertEqual('1,0,0\n', csv_data.readline())
+            self.assertEqual('%d,0,1\n' % 2**63, csv_data.readline())
+            self.assertEqual('0,1,2\n', csv_data.readline())
+        os.remove(fits_file)
+        os.remove(csv_file)
 
 if __name__ == '__main__':
     unittest.main()

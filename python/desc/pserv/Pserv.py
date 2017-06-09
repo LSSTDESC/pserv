@@ -196,6 +196,25 @@ class DbConnection(object):
                 message += ' %s vs %s' % (csv_col, table_col)
                 raise RuntimeError(message)
 
+class BinTableData(OrderedDict):
+    """
+    Class to manage FITS binary table data for generating CSV files.
+    Its primary purpose is to convert FITS columns that are bool arrays
+    into bit-packed long integer columns.  Otherwise it just serves
+    up the column arrays from the binary table.
+    """
+    def __init__(self, bintable, nbits=64):
+        super(BinTableData, self).__init__()
+        for col in bintable.columns:
+            if col.format[-1] == 'X':
+                flag_cols = zip(*(pack_flags(x, nbits=nbits) for x in
+                                  bintable.data[col.name]))
+                for i, flags in enumerate(flag_cols):
+                    name = '%s%i' % (col.name.upper(), i + 1)
+                    self[name] = np.array(flags, dtype=np.uint64)
+            else:
+                self[col.name] = bintable.data[col.name]
+
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                               column_mapping=None, callbacks=None):
     """
@@ -222,28 +241,19 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
     """
     if callbacks is None:
         callbacks = {}
-    nbits = 64
     bintable = fits.open(fits_file)[fits_hdunum]
+    bintable_data = BinTableData(bintable)
     if column_mapping is None:
-        column_mapping = OrderedDict()
-        for coldef in bintable.columns:
-            if coldef.format[-1] == 'X':
-                num_fields = int(np.ceil(float(coldef.format[:-1])/nbits))
-                for ifield in range(num_fields):
-                    name = '%s%i' % (coldef.name.upper(), ifield + 1)
-                    column_mapping[name] = name
-            else:
-                column_mapping[coldef.name] = coldef.name
+        column_mapping = OrderedDict([(name, name) for name in bintable_data])
     with open(csv_file, 'w') as csv_output:
         writer = csv.writer(csv_output, delimiter=',', lineterminator='\n')
         colnames = list(column_mapping.keys())
         writer.writerow(colnames)
         nrows = bintable.header['NAXIS2']
         columns = []
-        bintable_colnames = [x.name for x in bintable.columns]
         for colname in column_mapping.values():
-            if colname in bintable_colnames:
-                coldata = bintable.data[colname]
+            if colname in bintable_data.keys():
+                coldata = bintable_data[colname]
                 try:
                     coldata = callbacks[colname](coldata)
                 except KeyError:
