@@ -25,7 +25,7 @@ def get_db_info():
             # Travis CI usage:
             db_info = dict(database='myapp_test', username='travis',
                            host='127.0.0.1', port='3306')
-            test = desc.pserv.DbConnection(**db_info)
+            desc.pserv.DbConnection(**db_info)
         except RuntimeError as eobj:
             print(eobj)
             # Read the user's default configuration from ~/.my.cnf
@@ -37,8 +37,8 @@ def get_db_info():
                 del db_info['user']
             if db_info.has_key('password'):
                 del db_info['password']
-            test = desc.pserv.DbConnection(**db_info)
-    except Exception as eobj:
+            desc.pserv.DbConnection(**db_info)
+    except StandardError as eobj:
         print("No database connection:")
         print(eobj)
         db_info = {}
@@ -334,33 +334,15 @@ class PservTestCase(unittest.TestCase):
         with open(sql_file) as schema:
             lines = [x.strip() for x in schema.readlines()]
         self.assertIn('id BIGINT,', lines)
-        self.assertIn('coord_ra DOUBLE,' , lines)
-        self.assertIn('deblend_nChild INT,' , lines)
-        self.assertIn('base_SdssShape_xxSigma FLOAT,' , lines)
+        self.assertIn('coord_ra DOUBLE,', lines)
+        self.assertIn('deblend_nChild INT,', lines)
+        self.assertIn('base_SdssShape_xxSigma FLOAT,', lines)
         self.assertIn('FLAGS1 BIGINT,', lines)
         self.assertIn('FLAGS2 BIGINT,', lines)
         self.assertIn('FLAGS3 BIGINT,', lines)
         self.assertIn('primary key (id, project)', lines)
         self.assertIn('project INT,', lines)
         os.remove(sql_file)
-
-    def test_pack_flags(self):
-        "Test function to pack an array of bools into unsigned ints."
-        nflags = 142
-        nbits = 64
-        data = [np.array([True] + (nflags-1)*[False]),
-                np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False]),
-                np.array(2*nbits*[False] + [True] + (nflags-2*nbits-1)*[False]),
-                np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
-                np.array((2*nbits-1)*[False] + [True] + (nflags-2*nbits)*[False]),
-                np.array((nflags-1)*[False] + [True])]
-        expected = [(1, 0, 0), (0, 1, 0), (0, 0, 1),
-                    (2**(nbits-1), 0, 0), (0, 2**(nbits-1), 0),
-                    (0, 0, 2**(nflags-2*nbits-1))]
-        for flags, values in zip(data, expected):
-            packed = desc.pserv.pack_flags(flags, nbits=nbits)
-            for bigint, value in zip(packed, values):
-                self.assertEqual(bigint, value)
 
     def test_create_csv_file_from_fits_with_flag(self):
         "Test create_csv_file_from_fits for a file with flags."
@@ -376,6 +358,32 @@ class PservTestCase(unittest.TestCase):
             self.assertEqual('0,1,2\n', csv_data.readline())
         os.remove(fits_file)
         os.remove(csv_file)
+
+class BinTableDataTestCase(unittest.TestCase):
+    "TestCase class for BinTableData class."
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_pack_flags(self):
+        "Test function to pack an array of bools into unsigned ints."
+        nflags = 142
+        nbits = 64
+        data = [np.array([True] + (nflags-1)*[False]),
+                np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False]),
+                np.array(2*nbits*[False] + [True] + (nflags-2*nbits-1)*[False]),
+                np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
+                np.array((2*nbits-1)*[False] + [True] + (nflags-2*nbits)*[False]),
+                np.array((nflags-1)*[False] + [True])]
+        expected = [(1, 0, 0), (0, 1, 0), (0, 0, 1),
+                    (2**(nbits-1), 0, 0), (0, 2**(nbits-1), 0),
+                    (0, 0, 2**(nflags-2*nbits-1))]
+        for flags, values in zip(data, expected):
+            packed = desc.pserv.BinTableData.pack_flags(flags, nbits=nbits)
+            for bigint, value in zip(packed, values):
+                self.assertEqual(bigint, value)
 
 if __name__ == '__main__':
     unittest.main()

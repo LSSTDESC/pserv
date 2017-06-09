@@ -4,7 +4,6 @@ Pserv: Practice LSST database server code.
 from __future__ import absolute_import, print_function
 import copy
 import csv
-import json
 from collections import OrderedDict
 import numpy as np
 import astropy.io.fits as fits
@@ -12,9 +11,9 @@ import sqlalchemy
 import lsst.daf.persistence as dp
 
 __all__ = ['DbConnection', 'create_csv_file_from_fits',
-           'create_schema_from_fits', 'pack_flags']
+           'create_schema_from_fits', 'BinTableData']
 
-def _nullFunc(*args):
+def null_func(*args):
     """
     Default do-nothing function for processing data from a DBAPI 2
     cursor object.
@@ -72,7 +71,7 @@ class DbConnection(object):
         engine = sqlalchemy.create_engine(db_url)
         self._mysql_connection = engine.raw_connection()
 
-    def apply(self, sql, cursorFunc=_nullFunc):
+    def apply(self, sql, cursorFunc=null_func):
         """
         Apply an SQL statement, optionally using the cursorFunc to
         process any query results.
@@ -92,7 +91,7 @@ class DbConnection(object):
         cursor.execute(sql)
         results = cursorFunc(cursor)
         cursor.close()
-        if cursorFunc is _nullFunc:
+        if cursorFunc is null_func:
             self._mysql_connection.commit()
         return results
 
@@ -204,16 +203,47 @@ class BinTableData(OrderedDict):
     up the column arrays from the binary table.
     """
     def __init__(self, bintable, nbits=64):
+        """
+        Parameters
+        ----------
+        bintable : astropy.io.fits.hdu.table.BinTableHDU
+            Binary table to manage.
+        nbits : int, optional
+            Number of bits per integer.  Default: 64.
+        """
         super(BinTableData, self).__init__()
         for col in bintable.columns:
             if col.format[-1] == 'X':
-                flag_cols = zip(*(pack_flags(x, nbits=nbits) for x in
-                                  bintable.data[col.name]))
+                flag_cols = zip(*(self.pack_flags(x, nbits=nbits)
+                                  for x in bintable.data[col.name]))
                 for i, flags in enumerate(flag_cols):
                     name = '%s%i' % (col.name.upper(), i + 1)
                     self[name] = np.array(flags, dtype=np.uint64)
             else:
                 self[col.name] = bintable.data[col.name]
+
+    @staticmethod
+    def pack_flags(flags, nbits=64):
+        """
+        Pack an array of boolean flags into integers with nbits bits.
+
+        Parameters
+        ----------
+        flags : np.array
+            numpy array of bools.
+        nbits : int, optional
+            Number of bits per integer.  Default: 64.
+
+        Returns
+        -------
+        list : A list of integers with the packed flags.
+        """
+        num_ints = int(np.ceil(float(len(flags))/nbits))
+        subarrs = [flags[i*nbits:(i+1)*nbits] for i in range(num_ints)]
+        values = [sum([long(2**i) for i, flag in enumerate(subarr) if flag])
+                  for subarr in subarrs]
+        return values
+
 
 def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                               column_mapping=None, callbacks=None):
@@ -314,14 +344,14 @@ def write_schema_column(output, column, padding):
                 '1K' : 'BIGINT',
                 '1J' : 'INT',
                 '1I' : 'SMALLINT'}
-    format = column.format.strip("'")
-    if format[-1] == 'X':
+    format_ = column.format.strip("'")
+    if format_[-1] == 'X':
         write_bit_schema_column(output, column, padding)
         return
-    if int(format[:-1]) != 1:
-        # Skip vector columns.
+    if int(format_[:-1]) != 1:
+        # Skip other vector columns.
         return
-    output.write('%s%s %s,\n' % (padding, column.name, type_map[format]))
+    output.write('%s%s %s,\n' % (padding, column.name, type_map[format_]))
 
 def write_bit_schema_column(output, column, padding):
     """
@@ -344,30 +374,9 @@ def write_bit_schema_column(output, column, padding):
     """
     mysql_type = 'BIGINT'
     colsize = 64
-    format = column.format.strip("'")
-    num_bits = float(format[:-1])
+    format_ = column.format.strip("'")
+    num_bits = float(format_[:-1])
     ncols = int(np.ceil(num_bits/colsize))
     for icol in range(ncols):
         name = '%s%i' % (column.name.upper(), icol + 1)
         output.write('%s%s %s,\n' % (padding, name, mysql_type))
-
-def pack_flags(flags, nbits=64):
-    """
-    Pack an array of boolean flags into integers with nbits bits.
-
-    Parameters
-    ----------
-    flags : np.array
-        numpy array of bools.
-    nbits : int, optional
-        Number of bits per integer.  Default: 64.
-
-    Returns
-    -------
-    list : A list of integers with the packed flags.
-    """
-    num_ints = int(np.ceil(float(len(flags))/nbits))
-    subarrs = [flags[i*nbits:(i+1)*nbits] for i in range(num_ints)]
-    values = [sum([long(2**i) for i, flag in enumerate(subarr) if flag])
-              for subarr in subarrs]
-    return values
