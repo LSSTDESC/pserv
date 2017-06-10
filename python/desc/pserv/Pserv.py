@@ -32,10 +32,12 @@ class DbConnection(object):
         Parameters
         ----------
         **kwds : **dict
-            keyword arguments with the database info.  Minimally,
-            this would include host and port, but can also include
-            the database name.
+            keyword arguments with the database info.  Minimally, this
+            would include host (port=3306 by default), but can also
+            include the database name.
         """
+        if not kwds.has_key('port'):
+            kwds['port'] = 3306
         if not kwds.has_key('query'): # enable LOAD LOCAL INFILE
             kwds['query'] = dict()
         kwds['query']['local_infile'] = 1
