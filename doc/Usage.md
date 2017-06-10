@@ -1,11 +1,16 @@
 ## Code installation
 
-You'll need both the `lsst_apps` and `lsst_sims` components of the
-Stack installed, version v12_0 or later.  Assuming both of those are
-set up via `eups`, clone the `pserv` repository from GitHub, declare
-it with `eups`, and set it up:
+You'll need both the version 12_0 (or later) of the LSST Stack installed.
+On a `cori` machine at NERSC, doing
 ```
-$ git clone git@github.com:DarkEnergyScienceCollaboration/pserv.git
+source /global/common/cori/contrib/lsst/lsstDM/setupStack-13_0.sh
+```
+would suffice.
+
+Clone the `pserv` repository from GitHub, declare it with `eups`, and set
+it up:
+```
+$ git clone git@github.com:LSSTDESC/pserv.git
 $ cd pserv
 $ eups declare -r . pserv -t current
 $ setup pserv
@@ -13,31 +18,39 @@ $ setup pserv
 
 ## Database credentials
 
-`pserv` uses the same mechanism as the `lsst_sims` code for connecting
+`pserv` uses the same mechanism as the LSST Stack code for connecting
 to a database server.  In order to connect to the MySQL instance that
 the `pserv` scripts would access, you'll need to put the appropriate
 credentials in your `$HOME/.lsst/db-auth.paf` file.  For connecting to
-the `DESC_Twinkles_Level_2` database at NSERC, the `db-auth.paf` file
-would look like
+the `DESC_Twinkles_Level_2` or `DESC_DC1_Level_2` databases at NSERC,
+the `db-auth.paf` file would look like
 ```
 database: {
     authInfo: {
+        # DESC_Twinkles_Level_2
         host: scidb1.nersc.gov
         port: 3306
         user: desc_user
         password: <password>
     }
+    authInfo: {
+        # DESC_DC1_Level_2
+        host: nerscdb04.nersc.gov
+        port: 3306
+        user: DESC_DC1_Level_2_user
+        password: <password>
+    }
 }
 ```
-Here `desc_user` is the userid for the read-only account.  There is
-also an admin account that can be used for writing to the tables.  The
+The above userids provide read-only access.  There are also
+admin accounts that can be used for writing to the tables.  The
 credentials for either of these accounts can be obtained by emailing
 someone on the
-[Twinkles](https://github.com/DarkEnergyScienceCollaboration/Twinkles)
+[Twinkles](https://github.com/LSSTDESC/Twinkles)
 team.  Note that both the `~/.lsst` directory and the `db-auth.paf` must
 have owner-only permissions set.
 
-## Loading Level 2 data into the tables
+## Loading Level 2 Twinkles data into the tables
 
 Given an output repository filled with the results of Level 2
 processing, the `load_db.py` script can be used to fill the MySQL
