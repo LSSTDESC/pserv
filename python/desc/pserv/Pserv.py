@@ -152,7 +152,7 @@ class DbConnection(object):
         conversions = [dt_pair for dt_pair in data_types
                        if dt_pair[1].find('char') == -1]
         dtypes = dict((('int', 'SIGNED'),
-                       ('bigint', 'SIGNED'),
+                       ('bigint', 'UNSIGNED'),
                        ('tinyint', 'SIGNED'),
                        ('float', 'DECIMAL(50,25)'),
                        ('double', 'DECIMAL(65,30)')))
@@ -219,14 +219,14 @@ class BinTableData(OrderedDict):
     into bit-packed long integer columns.  Otherwise it just serves
     up the column arrays from the binary table.
     """
-    def __init__(self, bintable, nbits=63):
+    def __init__(self, bintable, nbits=64):
         """
         Parameters
         ----------
         bintable : astropy.io.fits.hdu.table.BinTableHDU
             Binary table to manage.
         nbits : int, optional
-            Number of bits per integer.  Default: 63.
+            Number of bits per integer.  Default: 64.
         """
         super(BinTableData, self).__init__()
         for col in bintable.columns:
@@ -241,7 +241,7 @@ class BinTableData(OrderedDict):
         self.nrows = len(self.values()[0])
 
     @staticmethod
-    def pack_flags(flags, nbits=63):
+    def pack_flags(flags, nbits=64):
         """
         Pack an array of boolean flags into integers with nbits bits.
 
@@ -250,7 +250,7 @@ class BinTableData(OrderedDict):
         flags : np.array
             numpy array of bools.
         nbits : int, optional
-            Number of bits per integer.  Default: 63.
+            Number of bits per integer.  Default: 64.
 
         Returns
         -------
@@ -303,7 +303,8 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
     if column_mapping is None:
         column_mapping = OrderedDict([(name, name) for name in bintable_data])
     with open(csv_file, 'w') as csv_output:
-        writer = csv.writer(csv_output, delimiter=',', lineterminator='\n')
+        writer = csv.writer(csv_output, delimiter=',', lineterminator='\n',
+                            quotechar="'")
         colnames = list(column_mapping.keys())
         writer.writerow(colnames)
         columns = []
@@ -385,7 +386,7 @@ def write_bit_schema_column(output, column, padding):
     """
     Write schema columns as BIGINT types to contain FITS bit columns
     of format 'NNNX', e.g, a FITS column with format '142X' will produce
-    3 (= ceil(142./63)) SQL table columns.  Following the Qserv baseline
+    3 (= ceil(142./64)) SQL table columns.  Following the Qserv baseline
     schema convention for the "FLAGS" columns, the column.name will be
     converted to upper case and the column number (starting with '1')
     will be appended, e.g., name='flags', format='142X' will produce
@@ -401,7 +402,7 @@ def write_bit_schema_column(output, column, padding):
         The padding string to prepend to the SQL schema column line.
     """
     mysql_type = 'BIGINT UNSIGNED'
-    colsize = 63
+    colsize = 64
     format_ = column.format.strip("'")
     num_bits = float(format_[:-1])
     ncols = int(np.ceil(num_bits/colsize))

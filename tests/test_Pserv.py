@@ -154,7 +154,7 @@ class PservTestCase(unittest.TestCase):
         "Create a FITS binary table with flags."
         hdulist = fits.HDUList()
         hdulist.append(fits.PrimaryHDU())
-        nbits = 63
+        nbits = 64
         nflags = 100
         colnames = ['flags', 'id']
         formats = ['%sX' % nflags, 'K']
@@ -373,7 +373,7 @@ class PservTestCase(unittest.TestCase):
         with open(csv_file) as csv_data:
             self.assertEqual('FLAGS1,FLAGS2,id\n', csv_data.readline())
             self.assertEqual('1,0,0\n', csv_data.readline())
-            self.assertEqual('%d,0,1\n' % 2**62, csv_data.readline())
+            self.assertEqual('%d,0,1\n' % 2**63, csv_data.readline())
             self.assertEqual('0,1,2\n', csv_data.readline())
         os.remove(fits_file)
         os.remove(csv_file)
