@@ -25,7 +25,7 @@ def get_db_info():
             # Travis CI usage:
             db_info = dict(database='myapp_test', username='travis',
                            host='127.0.0.1', port='3306')
-            test = desc.pserv.DbConnection(**db_info)
+            desc.pserv.DbConnection(**db_info)
         except RuntimeError as eobj:
             print(eobj)
             # Read the user's default configuration from ~/.my.cnf
@@ -37,8 +37,8 @@ def get_db_info():
                 del db_info['user']
             if db_info.has_key('password'):
                 del db_info['password']
-            test = desc.pserv.DbConnection(**db_info)
-    except Exception as eobj:
+            desc.pserv.DbConnection(**db_info)
+    except StandardError as eobj:
         print("No database connection:")
         print(eobj)
         db_info = {}
@@ -149,6 +149,28 @@ class PservTestCase(unittest.TestCase):
             os.remove(self.fits_file)
         hdulist.writeto(self.fits_file)
 
+    @staticmethod
+    def _create_fits_bintable_with_flags(fits_file):
+        "Create a FITS binary table with flags."
+        hdulist = fits.HDUList()
+        hdulist.append(fits.PrimaryHDU())
+        nbits = 64
+        nflags = 100
+        colnames = ['flags', 'id']
+        formats = ['%sX' % nflags, 'K']
+        data = [(np.array([True] + (nflags-1)*[False]),
+                 np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
+                 np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False])),
+                (0, 1, 2)]
+        columns = [fits.Column(name=colnames[i], format=formats[i],
+                               array=data[i]) for i in range(len(colnames))]
+        bintable = fits.BinTableHDU.from_columns(columns)
+        bintable.name = 'TEST_DATA'
+        hdulist.append(bintable)
+        if os.path.isfile(fits_file):
+            os.remove(fits_file)
+        hdulist.writeto(fits_file, clobber=True)
+
     def _create_csv_file(self, csv_file='test_file.csv',
                          column_mapping=None, fits_hdnum=1):
         """
@@ -257,6 +279,23 @@ class PservTestCase(unittest.TestCase):
             self.assertEqual(fp1, fp2)
         os.remove(csv_file)
 
+    def test_create_csv_file_from_fits_with_added_columns(self):
+        "Test create_csv_file_from_fits with added columns."
+        fits_file = os.path.join(os.environ['PSERV_DIR'], 'tests',
+                                 'ref-0-10,11_truncated.fits.gz')
+        hdunum = 1
+        csv_file = 'test_added_columns.csv'
+        projectId = 1
+        desc.pserv.create_csv_file_from_fits(fits_file, hdunum, csv_file,
+                                             added_columns=dict(projectId=projectId))
+        with open(csv_file) as csv_data:
+            reader = csv.reader(csv_data, delimiter=',')
+            row = reader.next()
+            self.assertEqual(row[-1], 'projectId')
+            for row in reader:
+                self.assertEqual(row[-1], '%s' % projectId)
+        os.remove(csv_file)
+
     def test_load_csv(self):
         """
         Test that after loading the csv file generated from FITS data,
@@ -299,6 +338,91 @@ class PservTestCase(unittest.TestCase):
         self.assertRaises(RuntimeError, self.connection.load_csv,
                           *(self.test_table, csv_file))
         os.remove(csv_file)
+
+    def test_create_schema_from_fits(self):
+        "Test the creation of a schema from a FITS binary table."
+        catalog_file = os.path.join(os.environ['PSERV_DIR'], 'tests',
+                                    'ref-0-10,11_truncated.fits.gz')
+        sql_file = 'bintable_schema.sql'
+        fits_hdunum = 1
+        table_name = 'deepCoadd_catalog'
+        desc.pserv.create_schema_from_fits(catalog_file, fits_hdunum, sql_file,
+                                           table_name,
+                                           primary_key='id, project',
+                                           add_columns=('project INT',))
+        with open(sql_file) as schema:
+            lines = [x.strip() for x in schema.readlines()]
+        self.assertIn('id BIGINT,', lines)
+        self.assertIn('coord_ra DOUBLE,', lines)
+        self.assertIn('deblend_nChild INT,', lines)
+        self.assertIn('base_SdssShape_xxSigma FLOAT,', lines)
+        self.assertIn('FLAGS1 BIGINT UNSIGNED,', lines)
+        self.assertIn('FLAGS2 BIGINT UNSIGNED,', lines)
+        self.assertIn('FLAGS3 BIGINT UNSIGNED,', lines)
+        self.assertIn('primary key (id, project)', lines)
+        self.assertIn('project INT,', lines)
+        os.remove(sql_file)
+
+    def test_create_csv_file_from_fits_with_flag(self):
+        "Test create_csv_file_from_fits for a file with flags."
+        fits_file = 'test_bin_table_flags.fits'
+        hdunum = 1
+        csv_file = 'test_bin_table_flags.csv'
+        self._create_fits_bintable_with_flags(fits_file)
+        desc.pserv.create_csv_file_from_fits(fits_file, hdunum, csv_file)
+        with open(csv_file) as csv_data:
+            self.assertEqual('FLAGS1,FLAGS2,id\n', csv_data.readline())
+            self.assertEqual('1,0,0\n', csv_data.readline())
+            self.assertEqual('%d,0,1\n' % 2**63, csv_data.readline())
+            self.assertEqual('0,1,2\n', csv_data.readline())
+        os.remove(fits_file)
+        os.remove(csv_file)
+
+    def test_get_pandas_data_frame(self):
+        """
+        Test get_pandas_data_frame which retrieves a df with the table
+        data given a select query.
+        """
+        self._fill_test_table()
+        # Test getting all of the columns
+        query = "select * from %s" % self.test_table
+        df = self.connection.get_pandas_data_frame(query)
+        self.assertEqual(df.shape, (4, 5))
+        self.assertEqual(df['keywd'].values[0], 'a')
+        self.assertAlmostEqual(df['double_value'].values[2], np.pi, places=5)
+
+        # Test getting a selection of columns.
+        query = "select keywd, double_value from %s" % self.test_table
+        df = self.connection.get_pandas_data_frame(query)
+        self.assertEqual(df.shape, (4, 2))
+        self.assertEqual(df['keywd'].values[0], 'a')
+        self.assertAlmostEqual(df['double_value'].values[2], np.pi, places=5)
+
+class BinTableDataTestCase(unittest.TestCase):
+    "TestCase class for BinTableData class."
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_pack_flags(self):
+        "Test function to pack an array of bools into unsigned ints."
+        nflags = 142
+        nbits = 64
+        data = [np.array([True] + (nflags-1)*[False]),
+                np.array(nbits*[False] + [True] + (nflags-nbits-1)*[False]),
+                np.array(2*nbits*[False] + [True] + (nflags-2*nbits-1)*[False]),
+                np.array((nbits-1)*[False] + [True] + (nflags-nbits)*[False]),
+                np.array((2*nbits-1)*[False] + [True] + (nflags-2*nbits)*[False]),
+                np.array((nflags-1)*[False] + [True])]
+        expected = [(1, 0, 0), (0, 1, 0), (0, 0, 1),
+                    (2**(nbits-1), 0, 0), (0, 2**(nbits-1), 0),
+                    (0, 0, 2**(nflags-2*nbits-1))]
+        for flags, values in zip(data, expected):
+            packed = desc.pserv.BinTableData.pack_flags(flags, nbits=nbits)
+            for bigint, value in zip(packed, values):
+                self.assertEqual(bigint, value)
 
 if __name__ == '__main__':
     unittest.main()
