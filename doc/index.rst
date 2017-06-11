@@ -24,11 +24,11 @@ API Documentation
 Pserv
 -----
 
-The main `PServ` module contains classes for building a `Pserv`
+The main ``PServ`` module contains classes for building a ``Pserv``
 mega-scale undistributed database: handling the connection to the
-`mysql` database, and transferring in data from files. If no
-documentation for the `Pserv` functions appears below (and before the
-"Repository Info" section), it means that the Sphinx `conf.py` needs
+``mysql`` database, and transferring in data from files. If no
+documentation for the ``Pserv` functions appears below (and before the
+"Repository Info" section), it means that the Sphinx ``conf.py`` needs
 fixing to handle the various import statements better.
 
 .. automodule:: Pserv
