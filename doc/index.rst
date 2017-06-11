@@ -1,5 +1,5 @@
 ============================================
-Pserv : mega-scale non-distributed database
+Pserv : mega-scale undistributed database
 ============================================
 
 This is a package of scripts to set up, maintain, and provide interfaces to a
@@ -22,6 +22,6 @@ API Documentation
 =================
 
 
-.. automodule:: python/desc/pserv
+.. automodule:: Pserv
     :members:
     :undoc-members:
