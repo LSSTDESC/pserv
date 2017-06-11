@@ -21,20 +21,44 @@ queries on LSST catalogs while ``Qserv`` is still being developed.
 API Documentation
 =================
 
+Pserv
+-----
+
+The main `PServ` module contains classes for building a `Pserv`
+mega-scale undistributed database: handling the connection to the
+`mysql` database, and transferring in data from files. If no
+documentation for the `Pserv` functions appears below (and before the
+"Repository Info" section), it means that the Sphinx `conf.py` needs
+fixing to handle the various import statements better.
 
 .. automodule:: Pserv
     :members:
     :undoc-members:
 
+
+Repository Info
+---------------
+
 .. automodule:: repository_info
     :members:
     :undoc-members:
+
+
+Registry Tools
+--------------
 
 .. automodule:: registry_tools
     :members:
     :undoc-members:
 
+
+Utilities
+---------
+
+If no documentation for the utility functions appears below it means
+that the Sphinx `conf.py` needs fixing to handle the various import
+statements better.
+
 .. automodule:: utils
     :members:
     :undoc-members:
-
