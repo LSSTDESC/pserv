@@ -22,6 +22,6 @@ API Documentation
 =================
 
 
-.. automodule:: python/desc/pserv
+.. automodule:: pserv
     :members:
     :undoc-members:
