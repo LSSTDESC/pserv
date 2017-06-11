@@ -8,8 +8,7 @@ sys.path.insert(0, os.path.abspath('../python/desc/pserv'))
 # http://stackoverflow.com/questions/15889621/sphinx-how-to-exclude-imports-in-automodule#15912502
 autodoc_mock_imports = ["lsst.daf.persistence", "astropy.time",
                         "astropy.io.fits", "lsst.afw.math",
-                        "lsst.utils",
-                        "Pserv.create_csv_file_from_fits"]
+                        "lsst.utils"]
 
 # For reference, here's the current list of imports:
 # from __future__ import absolute_import, print_function
