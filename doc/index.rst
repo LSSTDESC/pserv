@@ -25,3 +25,16 @@ API Documentation
 .. automodule:: Pserv
     :members:
     :undoc-members:
+
+.. automodule:: repository_info
+    :members:
+    :undoc-members:
+
+.. automodule:: registry_tools
+    :members:
+    :undoc-members:
+
+.. automodule:: utils
+    :members:
+    :undoc-members:
+
