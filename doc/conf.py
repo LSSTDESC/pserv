@@ -3,9 +3,31 @@ import os
 
 # Provide path to the python modules we want to run autodoc on
 sys.path.insert(0, os.path.abspath('../python/desc/pserv'))
+
 # Avoid imports that may be unsatisfied when running sphinx, see:
 # http://stackoverflow.com/questions/15889621/sphinx-how-to-exclude-imports-in-automodule#15912502
-autodoc_mock_imports = ["scipy","scipy.interpolate"]
+autodoc_mock_imports = ["lsst.daf.persistence", "astropy.time",
+                        "astropy.io.fits", "lsst.afw.math",
+                        "lsst.utils", ".Pserv"]
+
+# For reference, here's the current list of imports:
+# from __future__ import absolute_import, print_function
+# import copy
+# import csv
+# from collections import OrderedDict
+# import numpy as np
+# import pandas as pd
+# import astropy.io.fits as fits
+# import sqlalchemy
+# import lsst.daf.persistence as dp
+# import os
+# import sqlite3
+# import astropy.time
+# import pickle
+# import itertools
+# import sys
+# import lsst.afw.math as afwMath
+# import lsst.utils as lsstUtils
 
 extensions = [
     'sphinx.ext.autodoc',
