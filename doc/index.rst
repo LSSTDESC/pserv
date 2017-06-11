@@ -10,7 +10,7 @@ schema <https://lsst-web.ncsa.illinois.edu/schema/index.php?sVer=baseline>`_
 will be supported.
 
 The production LSST database will be implemented via
-```Qserv`` <https://github.com/lsst/qserv>`_, which is a distributed
+`Qserv <https://github.com/lsst/qserv>`_, which is a distributed
 database implementation with a "MySQL-like" DBMS.  Since
 ``Pserv`` is meant to emulate ``Qserv`` but on a single node, a MySQL
 database is used. ``Pserv`` allows you to start designing and testing
@@ -22,6 +22,6 @@ API Documentation
 =================
 
 
-.. automodule:: pserv
+.. automodule:: python/desc/pserv
     :members:
     :undoc-members:
