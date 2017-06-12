@@ -8,6 +8,7 @@ from collections import OrderedDict
 import sqlite3
 import numpy as np
 import astropy.io.fits as fits
+import lsst.afw.fits
 import lsst.afw.math as afwMath
 import lsst.daf.persistence as dp
 import lsst.utils as lsstUtils
@@ -127,7 +128,28 @@ def create_table(connection, table_name, dry_run=False, clobber=False):
                                  'create_%s.sql' % table_name)
     connection.run_script(create_script, dry_run=dry_run)
 
-def ingest_registry(connection, registry_file, project):
+def get_projectId(connection, projectName, table='Project'):
+    """
+    Get the ID of the named project from the db table.
+
+    Parameters
+    ----------
+    connection : desc.pserv.DbConnection
+        The connection object to use to modify the CcdVisit table.
+    registry_file : str
+        The sqlite registry file containing the visit information.
+    projectName : str
+        The name of the desired project.  This is used to
+        differentiate different projects in the MySQL tables that may
+        have colliding primary keys, e.g., various runs of Twinkles,
+        or PhoSim Deep results.
+    """
+    query = "select projectId from %s where projectName='%s'" \
+            % (table, projectName)
+    return connection.apply(query, lambda curs: [x[0] for x in curs])[0]
+
+
+def ingest_registry(connection, registry_file, projectName):
     """
     Ingest some relevant data from a registry.sqlite3 file into
     the CcdVisit table.
@@ -138,7 +160,13 @@ def ingest_registry(connection, registry_file, project):
         The connection object to use to modify the CcdVisit table.
     registry_file : str
         The sqlite registry file containing the visit information.
+    projectName : str
+        The name of the desired project.  This is used to
+        differentiate different projects in the MySQL tables that may
+        have colliding primary keys, e.g., various runs of Twinkles,
+        or PhoSim Deep results.
     """
+    projectId = get_projectId(connection, projectName)
     registry = sqlite3.connect(registry_file)
     query = """select taiObs, visit, filter, raft, ccd,
                expTime from raw where channel='0,0' order by visit asc"""
@@ -149,7 +177,7 @@ def ingest_registry(connection, registry_file, project):
         query = """insert into CcdVisit set ccdVisitId=%(ccdVisitId)i,
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
-                   obsStart='%(taiObs)s', project='%(project)s'
+                   obsStart='%(taiObs)s', projectId='%(projectId)s'
                    on duplicate key update
                    visitId=%(visit)i, ccdName='%(ccd)s',
                    raftName='%(raft)s', filterName='%(filter_)s',
@@ -160,9 +188,8 @@ def ingest_registry(connection, registry_file, project):
             print("query:", query)
             raise eobj
 
-def ingest_calexp_info(connection, repo, project):
-    """
-    Extract information such as zeroPoint, seeing, sky background, sky
+def ingest_calexp_info(connection, repo, projectName):
+    """Extract information such as zeroPoint, seeing, sky background, sky
     noise, etc., from the calexp products and insert the values into
     the CcdVisit table.
 
@@ -172,12 +199,13 @@ def ingest_calexp_info(connection, repo, project):
         The connection object to use to modify the CcdVisit table.
     repo : str
         The path the output data repository used by the Stack.
-    project : str
-        The name of the project for which the Level 2 analyses
-        run.  This is used to differentiate different projects in
-        the MySQL tables that may have colliding primary keys, e.g.,
-        various runs of Twinkles, or PhoSim Deep results.
+    projectName : str
+        The name of the desired project.  This is used to
+        differentiate different projects in the MySQL tables that may
+        have colliding primary keys, e.g., various runs of Twinkles,
+        or PhoSim Deep results.
     """
+    projectId = get_projectId(connection, projectName)
     # Use the Butler to find all of the visit/sensor combinations.
     butler = dp.Butler(repo)
     datarefs = butler.subset('calexp')
@@ -189,8 +217,12 @@ def ingest_calexp_info(connection, repo, project):
         if nrows % int(num_datarefs/20) == 0:
             sys.stdout.write('.')
             sys.stdout.flush()
-        calexp = dataref.get('calexp')
-        calexp_bg = dataref.get('calexpBackground')
+        try:
+            calexp = dataref.get('calexp')
+            calexp_bg = dataref.get('calexpBackground')
+        except lsst.afw.fits.FitsError as eobj:
+            print("FitsError:", str(eobj))
+            continue
         ccdVisitId = make_ccdVisitId(dataref.dataId['visit'],
                                      dataref.dataId['raft'],
                                      dataref.dataId['sensor'])
@@ -219,13 +251,13 @@ def ingest_calexp_info(connection, repo, project):
                    seeing=%(seeing)15.9e,
                    skyBg=%(skyBg)15.9e, skyNoise=%(skyNoise)15.9e
                    where ccdVisitId=%(ccdVisitId)i and
-                   project='%(project)s'""" % locals()
+                   projectId='%(projectId)s'""" % locals()
         connection.apply(query)
         nrows += 1
     print('!')
 
 def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
-                             flux_calibration, project,
+                             flux_calibration, projectName,
                              psFlux='base_PsfFlux_flux',
                              psFlux_Sigma='base_PsfFlux_fluxSigma',
                              flags=0, fits_hdunum=1, csv_file='temp.csv',
@@ -246,11 +278,11 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
     flux_calibration : function
         A callback function to convert from ADU to nanomaggies. Usually,
         this is a desc.pserv.FluxCalibrator object.
-    project : str
-        The name of the project for which the Level 2 analyses
-        run.  This is used to differentiate different projects in
-        the MySQL tables that may have colliding primary keys, e.g.,
-        various runs of Twinkles, or PhoSim Deep results.
+    projectName : str
+        The name of the desired project.  This is used to
+        differentiate different projects in the MySQL tables that may
+        have colliding primary keys, e.g., various runs of Twinkles,
+        or PhoSim Deep results.
     psFlux : str, optional
         The column name from the forced source catalog to use for the
         point source flux in the ForcedSource table.
@@ -271,12 +303,13 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
     cleanup : bool, optional
         Flag to delete the csv_file after loading the data. Default: True
     """
+    projectId = get_projectId(connection, projectName)
     column_mapping = OrderedDict((('objectId', 'objectId'),
                                   ('ccdVisitId', ccdVisitId),
                                   ('psFlux', psFlux),
                                   ('psFlux_Sigma', psFlux_Sigma),
                                   ('flags', flags),
-                                  ('project', project)))
+                                  ('projectId', projectId)))
     # Callbacks to apply calibration and convert to nanomaggies.
     callbacks = dict(((psFlux, flux_calibration),
                       (psFlux_Sigma, flux_calibration)))
@@ -287,7 +320,7 @@ def ingest_ForcedSource_data(connection, catalog_file, ccdVisitId,
     if cleanup:
         os.remove(csv_file)
 
-def ingest_Object_data(connection, catalog_file, project):
+def ingest_Object_data(connection, catalog_file, projectName):
     """
     Ingest the reference catalog from the merged coadds.
 
@@ -298,12 +331,13 @@ def ingest_Object_data(connection, catalog_file, project):
     catalog_file : str
         The path to the file of the merged coadd catalog file produced
         by Level 2 analysis.
-    project : str
-        The name of the project for which the Level 2 analyses
-        run.  This is used to differentiate different projects in
-        the MySQL tables that may have colliding primary keys, e.g.,
-        various runs of Twinkles, or PhoSim Deep results.
+    projectName : str
+        The name of the desired project.  This is used to
+        differentiate different projects in the MySQL tables that may
+        have colliding primary keys, e.g., various runs of Twinkles,
+        or PhoSim Deep results.
     """
+    projectId = get_projectId(connection, projectName)
     data = fits.open(catalog_file)[1].data
     nobjs = len(data['id'])
     print("Ingesting %i objects" % nobjs)
@@ -324,11 +358,11 @@ def ingest_Object_data(connection, catalog_file, project):
             extendedness = 1.
         query = """insert into Object
                    (objectId, parentObjectId, psRa, psDecl, extendedness,
-                   project)
+                   projectId)
                    values (%i, %i, %17.9e, %17.9e, %17.9e, '%s')
                    on duplicate key update psRa=%17.9e, psDecl=%17.9e,
                    extendedness=%17.9e""" \
-            % (objectId, parent, ra_val, dec_val, extendedness, project,
+            % (objectId, parent, ra_val, dec_val, extendedness, projectId,
                ra_val, dec_val, extendedness)
         connection.apply(query)
         nrows += 1

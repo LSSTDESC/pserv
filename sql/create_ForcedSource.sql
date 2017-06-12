@@ -4,6 +4,6 @@ create table if not exists ForcedSource (
        psFlux FLOAT,
        psFlux_Sigma FLOAT,
        flags TINYINT,
-       project CHAR(30),
-       primary key (objectId, ccdVisitID, project)
+       projectId INTEGER,
+       primary key (objectId, ccdVisitID, projectId)
        )

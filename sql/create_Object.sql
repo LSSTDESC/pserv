@@ -330,6 +330,6 @@ create table if not exists Object (
        extendedness FLOAT,
        FLAGS1 BIGINT,
        FLAGS2 BIGINT,
-       project CHAR(30),
-       primary key (objectId, project)
+       projectId INTEGER,
+       primary key (objectId, projectId)
        )

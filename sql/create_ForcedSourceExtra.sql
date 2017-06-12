@@ -12,6 +12,6 @@ create table if not exists ForcedSourceExtra (
        ap_50_0_Flux FLOAT,
        ap_50_0_Flux_Sigma FLOAT,
        flags TINYINT,
-       project CHAR(30),
-       primary key (objectId, ccdVisitID, project)
+       projectId INTEGER,
+       primary key (objectId, ccdVisitID, projectId)
        )

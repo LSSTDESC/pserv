@@ -31,6 +31,6 @@ create table if not exists CcdVisit (
        skyBg FLOAT,
        skyNoise FLOAT,
        flags INTEGER,
-       project CHAR(30),
-       primary key (ccdVisitId, project)
+       projectId INTEGER,
+       primary key (ccdVisitId, projectId)
        )
