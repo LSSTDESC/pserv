@@ -166,6 +166,10 @@ def ingest_registry(connection, registry_file, projectName):
         have colliding primary keys, e.g., various runs of Twinkles,
         or PhoSim Deep results.
     """
+    # Set the timezone for the MySQL session to GMT to avoid DST problem
+    # ("1292 Incorrect datetime value").
+    connection.apply("set time_zone = '+00:00'")
+
     projectId = get_projectId(connection, projectName)
     registry = sqlite3.connect(registry_file)
     query = """select taiObs, visit, filter, raft, ccd,
