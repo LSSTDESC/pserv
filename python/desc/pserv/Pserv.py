@@ -36,9 +36,9 @@ class DbConnection(object):
             would include host (port=3306 by default), but can also
             include the database name.
         """
-        if not kwds.has_key('port'):
+        if 'port' not in kwds:
             kwds['port'] = 3306
-        if not kwds.has_key('query'): # enable LOAD LOCAL INFILE
+        if 'query' not in kwds: # enable LOAD LOCAL INFILE
             kwds['query'] = dict()
         kwds['query']['local_infile'] = 1
         # Use lsst.daf.persistence.DbAuth to get username and password
@@ -70,7 +70,7 @@ class DbConnection(object):
             pass
 
         # Create a new mysql connection object.
-        db_url = sqlalchemy.engine.url.URL('mysql+mysqldb', **kwds)
+        db_url = sqlalchemy.engine.url.URL('mysql', **kwds)
         engine = sqlalchemy.create_engine(db_url)
         self._mysql_connection = engine.raw_connection()
 

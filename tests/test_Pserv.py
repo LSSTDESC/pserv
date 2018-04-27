@@ -33,9 +33,9 @@ def get_db_info():
             parser.read(os.path.join(os.environ['HOME'], '.my.cnf'))
             db_info = dict(parser.items('client'))
             db_info['database'] = 'test'
-            if db_info.has_key('user'):
+            if 'user' in db_info:
                 del db_info['user']
-            if db_info.has_key('password'):
+            if 'password' in db_info:
                 del db_info['password']
             desc.pserv.DbConnection(**db_info)
     except Exception as eobj:
