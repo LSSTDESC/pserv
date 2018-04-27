@@ -130,7 +130,7 @@ class RepositoryInfo(object):
             A dictionary of lists of patches, keyed by tract.
         """
         deepCoadd_dir = os.path.abspath(os.path.join(self.repo, 'deepCoadd'))
-        with open(os.path.join(deepCoadd_dir, 'skyMap.pickle')) as f:
+        with open(os.path.join(deepCoadd_dir, 'skyMap.pickle'), 'rb') as f:
             skymap = pickle.load(f)
         patches = {}
         for tract_info in skymap:

@@ -7,7 +7,7 @@ import csv
 import unittest
 from collections import OrderedDict
 from warnings import filterwarnings
-import ConfigParser
+import configparser
 import numpy as np
 import astropy.io.fits as fits
 import desc.pserv
@@ -29,7 +29,7 @@ def get_db_info():
         except RuntimeError as eobj:
             print(eobj)
             # Read the user's default configuration from ~/.my.cnf
-            parser = ConfigParser.ConfigParser()
+            parser = configparser.ConfigParser()
             parser.read(os.path.join(os.environ['HOME'], '.my.cnf'))
             db_info = dict(parser.items('client'))
             db_info['database'] = 'test'
@@ -38,7 +38,7 @@ def get_db_info():
             if db_info.has_key('password'):
                 del db_info['password']
             desc.pserv.DbConnection(**db_info)
-    except StandardError as eobj:
+    except Exception as eobj:
         print("No database connection:")
         print(eobj)
         db_info = {}

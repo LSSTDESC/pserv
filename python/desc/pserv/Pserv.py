@@ -260,7 +260,7 @@ class BinTableData(OrderedDict):
         """
         num_ints = int(np.ceil(float(len(flags))/nbits))
         subarrs = [flags[i*nbits:(i+1)*nbits] for i in range(num_ints)]
-        values = [sum([long(2**i) for i, flag in enumerate(subarr) if flag])
+        values = [sum([2**i for i, flag in enumerate(subarr) if flag])
                   for subarr in subarrs]
         return values
 
@@ -322,7 +322,7 @@ def create_csv_file_from_fits(fits_file, fits_hdunum, csv_file,
                 columns.append([colname]*bintable_data.nrows)
         for row in zip(*tuple(columns)):
             row = [x if isinstance(x, str) or np.isfinite(x)
-                   else '\N' for x in row]
+                   else b'\N' for x in row]
             writer.writerow(row)
 
 def create_schema_from_fits(fits_file, hdunum, outfile, table_name,

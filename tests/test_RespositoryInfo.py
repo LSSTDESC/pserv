@@ -33,10 +33,12 @@ class RepositoryInfoTestCase(unittest.TestCase):
 
     def test_get_visit_mjds(self):
         mjds = self.repo_info.get_visit_mjds()
-        self.assertEqual(mjds.keys()[0], 921297)
-        self.assertAlmostEqual(mjds.values()[0], 60934.288509722224)
-        self.assertEqual(mjds.keys()[-1], 1973403)
-        self.assertAlmostEqual(mjds.values()[-1], 62497.068709722225)
+        mjd_keys = [key for key in mjds.keys()]
+        mjd_values = [value for value in mjds.values()]
+        self.assertEqual(mjd_keys[0], 921297)
+        self.assertAlmostEqual(mjd_values[0], 60934.288509722224)
+        self.assertEqual(mjd_keys[-1], 1973403)
+        self.assertAlmostEqual(mjd_values[-1], 62497.068709722225)
 
     def test_get_visits(self):
         visits = self.repo_info.get_visits()
@@ -53,7 +55,8 @@ class RepositoryInfoTestCase(unittest.TestCase):
 
     def test_get_patches(self):
         patches = self.repo_info.get_patches()
-        self.assertItemsEqual((0,), patches.keys())
+        keys = [key for key in patches.keys()]
+        self.assertSequenceEqual((0,), keys)
         self.assertEqual(len(patches[0]), 9)
         self.assertTrue('0,0' in patches[0])
         self.assertTrue('1,1' in patches[0])
